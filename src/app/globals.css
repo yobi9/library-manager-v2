@@ -1,0 +1,520 @@
+/* ================================================================
+   📘 دليل المطور – نظرة عامة على نظام الثيمات (Theme System)
+   ================================================================
+   هذا الملف يُعرّف نظام ثيمات متكامل يعتمد على "المتغيرات الواعية بالسياق"
+   (Cascading CSS Variables)، حيث يتم استخدام نفس اسم المتغير في جميع
+   السياقات، وتتغير قيمته تلقائياً بناءً على السياق (العامة، الإدارة،
+   الفاتح، الداكن).
+
+   🔹 المبادئ الأساسية:
+     1. جميع المتغيرات لها اسم موحد (مثل --background، --primary، ...)
+     2. يتم إعادة تعريفها داخل كل سياق ( :root / .dark / .admin-layout )
+     3. لا وجود لأسماء خاصة بالإدارة (مثل admin-*) – كل شيء موحد.
+     4. المتغيرات الإضافية (مثل --bg-deep, --accent-hover) هي متغيرات
+        عامة يمكن استخدامها في أي مكان، لكن قيمها تختلف حسب السياق.
+
+   🔹 السياقات المعرفة حالياً:
+     - :root           → الوضع الفاتح للواجهة العامة.
+     - .dark           → الوضع الداكن للواجهة العامة.
+     - .admin-layout   → الوضع الداكن للواجهة الإدارية (الافتراضي).
+     - .admin-layout[data-theme="light"] → الوضع الفاتح للإدارة.
+
+   🔹 كيفية الاستخدام في أي مكون:
+     - استخدم كلاسات Tailwind مثل: bg-background, text-foreground, border-border
+     - أو استخدم المتغيرات مباشرة في CSS: var(--background)
+     - المتغيرات الإضافية: bg-bg-deep, shadow-card, text-accent-hover ... إلخ
+
+   🔹 إضافة سياق جديد:
+     - فقط أضف كلاساً جديداً (مثل .new-context) وأعد تعريف المتغيرات
+       التي تريد تغييرها، وسيعمل كل شيء تلقائياً.
+
+   📌 ملاحظة: هذا الملف معد لـ Tailwind v4 مع نظام @theme inline.
+  /* ================================================================
+   📘 نظام الألوان الأساسي (Foundation Theme System)
+   ================================================================
+   مصمم لمنصة أفلام ومسلسلات بمعايير عالمية. يعتمد على:
+   - متغيرات CSS متتالية (Cascading Variables) تتغير تلقائياً.
+   - توافق كامل بين الوضع الفاتح، الداكن، ولوحة الإدارة.
+   - تباين ألوان عالٍ (AA/AAA) وراحة بصرية ممتازة.
+   - إضافات جاهزة لعناصر الميديا (أزرار، تقييم، شارات، زجاج).
+   ================================================================ */
+
+@import "tailwindcss";
+
+@plugin "tailwindcss-animate";
+
+/* ================================================================
+   🖋 تعريفات الخط (Estra7ah)
+   ================================================================ */
+@font-face {
+  font-family: "Estra7ah";
+  src:
+    url("/fonts/Estra7ah-Light.woff2") format("woff2"),
+    url("/fonts/Estra7ah-Light.woff") format("woff");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Estra7ah";
+  src:
+    url("/fonts/Estra7ah-Medium.woff2") format("woff2"),
+    url("/fonts/Estra7ah-Medium.woff") format("woff");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Estra7ah";
+  src:
+    url("/fonts/Estra7ah-Bold.woff2") format("woff2"),
+    url("/fonts/Estra7ah-Bold.woff") format("woff");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ================================================================
+   🎨 التوكينز (Design Tokens) – سياقات الألوان
+   ================================================================ */
+/* ---------- 1. الوضع الفاتح العام ---------- */
+:root {
+  /* الأساسيات */
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+  --popover: #ffffff;
+  --popover-foreground: #0f172a;
+  --primary: #0f172a;
+  --primary-foreground: #f8fafc;
+  --secondary: #f1f5f9;
+  --secondary-foreground: #0f172a;
+  --muted: #f1f5f9;
+  --muted-foreground: #64748b;
+  --accent: #f1f5f9;
+  --accent-foreground: #0f172a;
+  --destructive: #dc2626; /* متناسق مع كل السياقات */
+  --destructive-foreground: #ffffff;
+  --success: #10b981;
+  --success-foreground: #ffffff;
+  --warning: #f59e0b;
+  --warning-foreground: #ffffff;
+  --border: #e2e8f0;
+  --input: #e2e8f0;
+  --ring: #94a3b8;
+  --radius: 0.5rem;
+
+  /* متغيرات إضافية (مساحات، ظلال، حدود) */
+  --bg-deep: #f1f5f9;
+  --bg-hover: rgba(0, 0, 0, 0.04);
+  --accent-hover: #1e293b; /* اشتقاق داكن من primary */
+  --accent-glow: rgba(0, 150, 136, 0.15);
+  --border-strong: #cbd5e1;
+  --shadow-card: 0 4px 12px rgba(0, 0, 0, 0.05);
+  --shadow-hover: 0 8px 24px rgba(0, 0, 0, 0.08);
+
+  /* ---- إضافات منصة الأفلام ---- */
+  --hero-overlay: linear-gradient(
+    to top,
+    rgba(255, 255, 255, 0.95) 0%,
+    rgba(255, 255, 255, 0.6) 50%,
+    rgba(255, 255, 255, 0.1) 100%
+  );
+  --hero-text-shadow: 0 2px 8px rgba(255, 255, 255, 0.8);
+  --glass-bg: rgba(255, 255, 255, 0.7);
+  --glass-border: rgba(0, 0, 0, 0.08);
+  --glass-blur: blur(12px);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+
+  --play-btn-bg: #0f172a;
+  --play-btn-text: #ffffff;
+  /* --play-btn-hover: يمكن توليده تلقائياً بـ color-mix(in srgb, var(--play-btn-bg) 90%, black) */
+  --favorite-btn-bg: rgba(0, 0, 0, 0.05);
+  --favorite-btn-border: rgba(0, 0, 0, 0.12);
+  --favorite-btn-hover-bg: rgba(0, 0, 0, 0.1);
+
+  --rating-star: #eab308; /* ذهبي دافئ */
+  --rating-star-empty: #d4d4d4;
+  --badge-bg: rgba(0, 0, 0, 0.05);
+  --badge-text: #0f172a;
+  --badge-border: rgba(0, 0, 0, 0.1);
+  --skeleton-base: #e2e8f0;
+  --skeleton-shine: #f1f5f9;
+  --text-on-media: #0f172a;
+
+  /* السويتش */
+  --switch-bg: #334f13;
+  --switch-border: #334f13;
+  --switch-thumb: #ffffff;
+  --switch-off-bg: #e2e8f0;
+  --switch-off-border: #cbd5e1;
+  --switch-off-thumb: #ffffff;
+  --switch-icon-on: #ffffff;
+  --switch-icon-off: #9ca3af;
+  --dot-indicator: #0f172a;
+
+  /* الحركة */
+  --duration-fast: 150ms;
+  --duration-normal: 250ms;
+  --duration-slow: 400ms;
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+
+  --font-estra7ah: "Estra7ah", sans-serif;
+}
+
+/* ---------- 2. الوضع الداكن العام ---------- */
+.dark {
+  --background: #0a0a0a;
+  --foreground: #ededed;
+  --card: #0a0a0a;
+  --card-foreground: #ededed;
+  --popover: #0a0a0a;
+  --popover-foreground: #ededed;
+  --primary: #ededed;
+  --primary-foreground: #0a0a0a;
+  --secondary: #262626;
+  --secondary-foreground: #ededed;
+  --muted: #262626;
+  --muted-foreground: #a3a3a3;
+  --accent: #262626;
+  --accent-foreground: #ededed;
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+  --border: #262626;
+  --input: #262626;
+  --ring: #d4d4d4;
+
+  --bg-deep: #141414;
+  --bg-hover: rgba(255, 255, 255, 0.05);
+  --accent-hover: #404040;
+  --accent-glow: rgba(0, 150, 136, 0.2);
+  --border-strong: #3a3a3a;
+  --shadow-card: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-hover: 0 8px 24px rgba(0, 0, 0, 0.6);
+
+  --hero-overlay: linear-gradient(
+    to top,
+    rgba(0, 0, 0, 0.95) 0%,
+    rgba(0, 0, 0, 0.4) 50%,
+    rgba(0, 0, 0, 0.1) 100%
+  );
+  --hero-text-shadow: 0 2px 8px rgba(0, 0, 0, 0.8);
+  --glass-bg: rgba(20, 20, 30, 0.7);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-blur: blur(12px);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+
+  --play-btn-bg: #ffffff;
+  --play-btn-text: #000000;
+  --favorite-btn-bg: rgba(255, 255, 255, 0.1);
+  --favorite-btn-border: rgba(255, 255, 255, 0.2);
+  --favorite-btn-hover-bg: rgba(255, 255, 255, 0.2);
+
+  --rating-star: #f5c518;
+  --rating-star-empty: #4a4a4a;
+  --badge-bg: rgba(255, 255, 255, 0.08);
+  --badge-text: #ffffff;
+  --badge-border: rgba(255, 255, 255, 0.12);
+  --skeleton-base: #1e1e2a;
+  --skeleton-shine: #2a2a3a;
+  --text-on-media: #ffffff;
+
+  --switch-bg: #334f13;
+  --switch-border: #334f13;
+  --switch-thumb: #ffffff;
+  --switch-off-bg: #374151;
+  --switch-off-border: #4b5563;
+  --switch-off-thumb: #d1d5db;
+  --dot-indicator: #ededed;
+
+ --ring: #6b7280
+
+
+
+
+}
+
+/* ---------- 3. لوحة الإدارة – الوضع الداكن ---------- */
+.admin-layout {
+  --background: #0b111e;
+  --foreground: #dee2ec;
+  --card: #151b2d;
+  --card-foreground: #dee2ec;
+  --popover: #151b2d;
+  --popover-foreground: #dee2ec;
+  --primary: #00796b; /* تباين عالي جداً */
+  --primary-foreground: #ffffff;
+  --secondary: rgba(255, 255, 255, 0.05);
+  --secondary-foreground: #dee2ec;
+  --muted: rgba(255, 255, 255, 0.05);
+  --muted-foreground: rgba(158, 162, 174, 0.6);
+  --accent: #00796b;
+  --accent-foreground: #ffffff;
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+  --success: #10b981;
+  --success-foreground: #ffffff;
+  --warning: #f59e0b;
+  --warning-foreground: #ffffff;
+  --border: rgba(255, 255, 255, 0.06);
+  --input: #0f1421;
+  --ring: #00796b;
+
+  --bg-deep: #0b1015;
+  --bg-hover: rgba(255, 255, 255, 0.05);
+  --accent-hover: #00695c;
+  --accent-glow: rgba(0, 150, 136, 0.15);
+  --border-strong: rgba(255, 255, 255, 0.1);
+  --shadow-card: 0 8px 32px rgba(0, 0, 0, 0.4);
+  --shadow-hover: 0 12px 48px rgba(0, 0, 0, 0.6);
+
+  --hero-overlay: linear-gradient(to top, rgba(0, 0, 0, 0.9) 0%, rgba(0, 0, 0, 0.3) 70%);
+  --hero-text-shadow: 0 2px 8px rgba(0, 0, 0, 0.7);
+  --glass-bg: rgba(20, 25, 40, 0.75);
+  --glass-border: rgba(255, 255, 255, 0.05);
+  --glass-blur: blur(14px);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+
+  --play-btn-bg: #00796b;
+  --play-btn-text: #ffffff;
+  --favorite-btn-bg: rgba(0, 150, 136, 0.1);
+  --favorite-btn-border: rgba(0, 150, 136, 0.3);
+  --favorite-btn-hover-bg: rgba(0, 150, 136, 0.2);
+
+  --rating-star: #f5c518;
+  --rating-star-empty: #3a3f55;
+  --badge-bg: rgba(255, 255, 255, 0.05);
+  --badge-text: #dee2ec;
+  --badge-border: rgba(255, 255, 255, 0.08);
+  --skeleton-base: #1a1f30;
+  --skeleton-shine: #242b3f;
+  --text-on-media: #ffffff;
+
+  --switch-bg: #8bc34a;
+  --switch-border: #8bc34a;
+  --switch-thumb: #334f13;
+  --switch-off-bg: #0f1421;
+  --switch-off-border: #0f1421;
+  --switch-off-thumb: #192034;
+  --switch-icon-on: #ffffff;
+  --switch-icon-off: #6b7280;
+  --dot-indicator: #009688;
+}
+
+/* ---------- 4. لوحة الإدارة – الوضع الفاتح ---------- */
+.admin-layout[data-theme="light"] {
+  --background: #ffffff;
+  --foreground: #1a1a1a;
+  --card: #ffffff;
+  --card-foreground: #1a1a1a;
+  --popover: #ffffff;
+  --popover-foreground: #1a1a1a;
+  --primary: #00796b;
+  --primary-foreground: #ffffff;
+  --secondary: rgba(0, 0, 0, 0.04);
+  --secondary-foreground: #1a1a1a;
+  --muted: rgba(0, 0, 0, 0.04);
+  --muted-foreground: #6b7280;
+  --accent: #00796b;
+  --accent-foreground: #ffffff;
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+  --border: rgba(0, 0, 0, 0.08);
+  --input: #f3f4f6;
+  --ring: #00796b;
+
+  --bg-deep: #f8fafc;
+  --bg-hover: rgba(0, 0, 0, 0.04);
+  --accent-hover: #00695c;
+  --accent-glow: rgba(0, 150, 136, 0.15);
+  --border-strong: #cbd5e1;
+  --shadow-card: 0 4px 12px rgba(0, 0, 0, 0.06);
+  --shadow-hover: 0 8px 24px rgba(0, 0, 0, 0.1);
+
+  --hero-overlay: linear-gradient(
+    to top,
+    rgba(255, 255, 255, 0.95) 0%,
+    rgba(255, 255, 255, 0.6) 50%,
+    rgba(255, 255, 255, 0.1) 100%
+  );
+  --hero-text-shadow: 0 2px 8px rgba(255, 255, 255, 0.8);
+  --glass-bg: rgba(255, 255, 255, 0.7);
+  --glass-border: rgba(0, 0, 0, 0.08);
+  --glass-blur: blur(12px);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+
+  --play-btn-bg: #00796b;
+  --play-btn-text: #ffffff;
+  --favorite-btn-bg: rgba(0, 0, 0, 0.05);
+  --favorite-btn-border: rgba(0, 0, 0, 0.12);
+  --favorite-btn-hover-bg: rgba(0, 0, 0, 0.1);
+
+  --rating-star: #eab308;
+  --rating-star-empty: #d4d4d4;
+  --badge-bg: rgba(0, 0, 0, 0.05);
+  --badge-text: #1a1a1a;
+  --badge-border: rgba(0, 0, 0, 0.1);
+  --skeleton-base: #e2e8f0;
+  --skeleton-shine: #f8fafc;
+  --text-on-media: #1a1a1a;
+
+  --switch-bg: #8bc34a;
+  --switch-border: #8bc34a;
+  --switch-thumb: #334f13;
+  --switch-off-bg: #e5e7eb;
+  --switch-off-border: #d1d5db;
+  --switch-off-thumb: #ffffff;
+  --dot-indicator: #1a1a1a;
+}
+
+/* ================================================================
+   🔗 ربط المتغيرات مع Tailwind v4
+   ================================================================ */
+@theme inline {
+  --font-estra7ah: var(--font-estra7ah);
+
+  /* الأساسيات */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius: var(--radius);
+
+  /* الإضافية */
+  --color-bg-deep: var(--bg-deep);
+  --color-bg-hover: var(--bg-hover);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-glow: var(--accent-glow);
+  --color-border-strong: var(--border-strong);
+  --shadow-card: var(--shadow-card);
+  --shadow-hover: var(--shadow-hover);
+
+  /* الميديا */
+  --color-glass-bg: var(--glass-bg);
+  --color-glass-border: var(--glass-border);
+  --color-play-btn-bg: var(--play-btn-bg);
+  --color-play-btn-text: var(--play-btn-text);
+  --color-favorite-btn-bg: var(--favorite-btn-bg);
+  --color-favorite-btn-border: var(--favorite-btn-border);
+  --color-favorite-btn-hover-bg: var(--favorite-btn-hover-bg);
+  --color-rating-star: var(--rating-star);
+  --color-rating-star-empty: var(--rating-star-empty);
+  --color-badge-bg: var(--badge-bg);
+  --color-badge-text: var(--badge-text);
+  --color-badge-border: var(--badge-border);
+  --color-skeleton-base: var(--skeleton-base);
+  --color-skeleton-shine: var(--skeleton-shine);
+  --color-text-on-media: var(--text-on-media);
+
+  /* السويتش */
+  --color-switch-bg: var(--switch-bg);
+  --color-switch-border: var(--switch-border);
+  --color-switch-thumb: var(--switch-thumb);
+  --color-switch-off-bg: var(--switch-off-bg);
+  --color-switch-off-border: var(--switch-off-border);
+  --color-switch-off-thumb: var(--switch-off-thumb);
+  --color-switch-icon-on: var(--switch-icon-on);
+  --color-switch-icon-off: var(--switch-icon-off);
+  --color-dot-indicator: var(--dot-indicator);
+
+  /* الحركة (جاهزة للاستخدام كـ transition-fast, ...) */
+  --transition-fast: var(--duration-fast) var(--ease-out);
+  --transition-smooth: var(--duration-normal) var(--ease-in-out);
+  --transition-spring: var(--duration-slow) var(--ease-spring);
+}
+
+/* ================================================================
+   🧩 أنماط عامة
+   ================================================================ */
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-estra7ah);
+}
+
+/* ================================================================
+   🖱 أشرطة التمرير المخصصة
+   ================================================================ */
+.custom-sidebar-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+.custom-sidebar-scroll::-webkit-scrollbar-thumb {
+  background: #242e42;
+  border-radius: 10px;
+}
+.custom-sidebar-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.admin-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #242e42 transparent;
+}
+.admin-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+.admin-scroll::-webkit-scrollbar-thumb {
+  background: #242e42;
+  border-radius: 10px;
+}
+.admin-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* ---------- صناديق غارقة إلى الداخل (Inset / Depressed) ---------- */
+/* تخدع العين فتبدو حفرة غائرة بدل لوحة بارزة: ظل داخلي من الأعلى،
+   لمعة داخلية من الأسفل، وملء أغمق من السطح (var(--input)). */
+.admin-layout .admin-sunken {
+  background-color: var(--input);
+  background-image: linear-gradient(
+    180deg,
+    rgba(0, 0, 0, 0.3) 0%,
+    rgba(0, 0, 0, 0.08) 50%,
+    rgba(0, 0, 0, 0.22) 100%
+  );
+  border-color: var(--border);
+  border-top-color: rgba(255, 255, 255, 0.15);
+  border-bottom-color: rgba(0, 0, 0, 0.45);
+  box-shadow:
+    inset 0 3px 10px rgba(0, 0, 0, 0.6),
+    inset 0 0 28px rgba(0, 0, 0, 0.3),
+    inset 0 -2px 4px rgba(255, 255, 255, 0.05);
+}
+
+/* الوضع الفاتح: عكس الاتجاهات (حافة علوية أغمق + سفلية أفتح). */
+.admin-layout[data-theme="light"] .admin-sunken {
+  border-top-color: rgba(0, 0, 0, 0.12);
+  border-bottom-color: rgba(255, 255, 255, 0.7);
+  box-shadow:
+    inset 0 2px 6px rgba(0, 0, 0, 0.22),
+    inset 0 -1px 3px rgba(255, 255, 255, 0.8);
+}
+
+/* ---------- حاوية بارزة (Raised) تحوي صناديق غارقة ---------- */
+/* عكس الغارق: ملء أفتح من السطح + ظل خارجي + إطار أوضح. */
+.admin-layout .admin-raised {
+  background-color: var(--card);
+  border: 1px solid var(--border-strong);
+  box-shadow: var(--shadow-card);
+}

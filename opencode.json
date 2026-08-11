@@ -1,0 +1,71 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "skills": {
+    "paths": [
+      "C:/Users/Administrator/.verdent/skills"
+    ]
+  },
+  "instructions": [
+    "https://raw.githubusercontent.com/JRedeker/opencode-shell-strategy/trunk/shell_strategy.md"
+  ],
+  "plugin": [
+    "@tarquinen/opencode-dcp",
+    "opencode-pty"
+  ],
+  "mcp": {
+    "context7": {
+      "type": "remote",
+      "url": "https://mcp.context7.com/mcp",
+      "headers": {
+        "Authorization": "Bearer ctx7sk-2188613d-74a9-4feb-bf9c-300eb429aa86"
+      },
+      "enabled": true
+    },
+    "supermemory": {
+      "type": "remote",
+      "url": "https://mcp.supermemory.ai/mcp",
+      "enabled": true
+    },
+    "filesystem": {
+      "type": "local",
+      "command": [
+        "npx",
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "C:\\projects\\library-manager-v2"
+      ],
+      "enabled": true
+    },
+    "git": {
+      "type": "local",
+      "command": [
+        "npx",
+        "-y",
+        "@modelcontextprotocol/server-git",
+        "C:\\projects\\library-manager-v2"
+      ],
+      "enabled": true
+    },
+    "browser": {
+      "type": "local",
+      "command": [
+        "npx",
+        "-y",
+        "@modelcontextprotocol/server-puppeteer"
+      ],
+      "enabled": true
+    }
+  },
+  "provider": {
+    "google": {
+      "models": {
+        "gemini-3.5-flash": {
+          "name": "Gemini 3.5 Flash"
+        },
+        "gemini-3.6-flash": {
+          "name": "Gemini 3.6 Flash"
+        }
+      }
+    }
+  }
+}
