@@ -3,22 +3,53 @@ import crypto from "crypto";
 import path from "path";
 import fs from "fs/promises";
 import { getEventBus } from "./event-bus";
+import { runInWriterContext } from "../db/db";
+import { logger } from "../observability/logger";
 import { EnrichmentMediaRepository } from "../repositories/enrichment-media-repository";
 import { MediaRepository } from "../repositories/media-repository";
 import { LibraryRepository } from "../repositories/library-repository";
 import { EnrichmentApprovalRepository } from "../repositories/enrichment-repository";
+import { SearchRepository } from "../repositories/search-repository";
 import { ActivityRepository } from "../repositories/activity-repository";
 import { SettingsService } from "./settings-service";
 import { ENRICHED_WEB_PREFIX } from "./image-service";
 
+/**
+ * قائمة حظر SSRF: النطاقات المحلية والعناوين الخاصة (RFC1918 و169.254.0.0/16)
+ * وأسماء المضيفات الخاصة — تُفحص كبادئة (وليس تطابقاً تاماً بـ `$`)، لأن regex
+ * سابق كان يختتم بـ `$` خارج المجموعة فلم يحظر أي عنوان IP خاص فعلياً
+ * (مثل 127.0.0.1 و10.0.0.1 و192.168.1.5 و172.16.0.1).
+ */
 const SSRF_BLOCKLIST =
-  /^(127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|0\.0\.0\.0|localhost|169\.254\.|metadata\.google\.internal|\[::1\])$/;
+  /^(127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|169\.254\.|0\.0\.0\.0|localhost|metadata\.google\.internal|\[::1\])/i;
 
+/**
+ * يتحقق إن كان اسم مضيف محظوراً وفق قائمة SSRF (فحص بادئ، غير حساس لحالة الأحرف).
+ *
+ * @param hostname - اسم المضيف كما يعيده `URL.hostname` (بلا بروتوكول أو مسار).
+ * @returns `true` إذا كان المضيف محظوراً (نطاق خاص/محلي/خدمة وصفية).
+ */
+export function isBlockedHostname(hostname: string): boolean {
+  return SSRF_BLOCKLIST.test(hostname.toLowerCase());
+}
+
+/** مهلة طلبات شبكة TMDB وصورها (بالمللي ثانية) — تمنع تعليق طلبات الإثراء عند
+ * تعطل المزود أو بطئه (تجميد «زر الإثراء» بلا نهاية). يتبع نمط بقية خدمات
+ * الشبكة في المشروع (`image-service` = 8s، `live-stream-service`). */
+const ENRICHMENT_FETCH_TIMEOUT_MS = 10000;
+
+/**
+ * يتحقق من أمان رابط صورة قبل تنزيله (منع SSRF): بروتوكول http(s) فقط
+ * ومضيف غير محظور.
+ *
+ * @param imageUrl - رابط الصورة الكامل.
+ * @returns `true` إذا كان الرابط آمناً للتنزيل.
+ */
 function isSafeImageUrl(imageUrl: string): boolean {
   try {
     const parsed = new URL(imageUrl);
     if (!["http:", "https:"].includes(parsed.protocol)) return false;
-    return !SSRF_BLOCKLIST.test(parsed.hostname);
+    return !isBlockedHostname(parsed.hostname);
   } catch {
     return false;
   }
@@ -76,6 +107,7 @@ interface BatchTracker {
   successful: number;
   failed: number;
   pending: number;
+  skipped: number;
   processed: number;
 }
 
@@ -104,6 +136,7 @@ export class TmdbEnrichmentService extends EventEmitter {
   private readonly SEARCH_CACHE_MAX_SIZE = 500;
   private recentlyFailed = new Map<string | number, BackoffEntry>();
   private cancelledSessions = new Set<string>();
+  private inFlightItems = new Set<number>();
   private cachedTableColumns: Set<string> | null = null;
 
   private readonly BACKOFF_BASE_MS = 300000;
@@ -111,15 +144,35 @@ export class TmdbEnrichmentService extends EventEmitter {
 
   private apiKey: string;
 
+  private isScanActive: () => boolean = () => false;
+
+  /**
+   * يبني الخدمة مع مستودعاتها ومفتاح TMDB والإعدادات الاختيارية.
+   *
+   * @param enrichmentRepo - مستودع بيانات الإثراء (genres/people/companies).
+   * @param mediaRepo - مستودع عناصر الوسائط.
+   * @param libraryRepo - مستودع المكتبات.
+   * @param approvalRepo - مستودع اقتراحات الموافقة على الإثراء.
+   * @param searchRepo - مستودع فهرس البحث FTS5 (لمزامنة الصف بعد الإثراء).
+   * @param apiKey - مفتاح TMDB (فارغ إن لم يُضبط بعد).
+   * @param config - إعدادات إضافية تُدمج مع الافتراضية.
+   * @param activityRepo - مستودع سجل الأنشطة (اختياري).
+   * @param settingsService - خدمة الإعدادات (اختياري).
+   * @param isScanActive - دالة تحدد إن كان ماسح مكتبات نشطاً حالياً؛ عند نشاطه
+   *   يتخطى الإثراء (فردي وجماعي) لمنع تصادم قفل الكتابة WAL الوحيد مع كاتب
+   *   الماسح — المصدر الرئيسي لتجميد التطبيق أثناء الإثراء. افتراضياً `() => false`.
+   */
   constructor(
     enrichmentRepo: EnrichmentMediaRepository,
     mediaRepo: MediaRepository,
     libraryRepo: LibraryRepository,
     approvalRepo: EnrichmentApprovalRepository,
+    private searchRepo: SearchRepository,
     apiKey: string,
     config: Record<string, unknown> = {},
     private activityRepo?: ActivityRepository,
     settingsService?: SettingsService,
+    isScanActive?: () => boolean,
   ) {
     super();
     this.enrichmentRepo = enrichmentRepo;
@@ -129,9 +182,65 @@ export class TmdbEnrichmentService extends EventEmitter {
     this.settingsService = settingsService;
     this.apiKey = apiKey;
     this.config = { ...this.config, ...config };
+    if (isScanActive) this.isScanActive = isScanActive;
 
     setInterval(() => this.searchCache.clear(), 300000).unref();
     setInterval(() => this._cleanupBackoff(), 600000).unref();
+
+    // مزامنة المفتاح في الذاكرة مع أي تغيير يصل عبر `settings_updated` (من منصة
+    // التحكم أو صفحة الإعدادات الإدارية) دون انتظار إعادة تشغيل الخادم.
+    getEventBus().on("settings_updated", (data) =>
+      this._onSettingsUpdated(data as { key?: string; value?: unknown }),
+    );
+  }
+
+  /**
+   * يحفظ مفتاح TMDB API: يفعّله في الذاكرة فوراً ثم يثبّته في إعدادات النظام
+   * (`tmdb_api_key`) عبر `SettingsService` عند توفّره، مع تمرير المستخدم والـ IP
+   * لسجل تدقيق الإعدادات. كتابة القاعدة تفشل مع إبقاء المفتاح فعّالاً في الذاكرة.
+   *
+   * @param apiKey - مفتاح TMDB API المراد حفظه.
+   * @param userId - معرّف المستخدم المسؤول عن التغيير (اختياري — لسجل التدقيق).
+   * @param ip - عنوان IP الخاص بالتغيير (اختياري — لسجل التدقيق).
+   * @returns لا يُرجع قيمة.
+   * @throws إذا فشل كتابة الإعداد في قاعدة البيانات.
+   */
+  async saveApiKey(apiKey: string, userId?: number, ip?: string): Promise<void> {
+    this.apiKey = apiKey;
+    if (this.settingsService) {
+      await this.settingsService.updateSettings({ tmdb_api_key: apiKey }, userId, ip);
+    }
+  }
+
+  /**
+   * يقرأ مفتاح TMDB API المحفوظ في الإعدادات ويجعله فعّالاً في الذاكرة.
+   *
+   * يُستدعى عند بدء الخدمة (في `services/index.ts`) بحيث لا يفقد النظام المفتاح
+   * بعد إعادة تشغيل الخادم. القيمة المخزنة (عند وجودها وغير فارغة) لها الأولوية
+   * على مفتاح الـ constructor الفارغ.
+   *
+   * @returns المفتاح النشط بعد القراءة (المخزّن أو الممرَّر للبناء).
+   */
+  async loadApiKeyFromSettings(): Promise<string> {
+    if (this.settingsService) {
+      const stored = await this.settingsService.getSetting("tmdb_api_key");
+      if (typeof stored === "string" && stored.trim() !== "") {
+        this.apiKey = stored;
+      }
+    }
+    return this.apiKey;
+  }
+
+  /**
+   * معالج حدث `settings_updated` على الحافلة العامة: يحدّث مفتاح TMDB في الذاكرة
+   * عند تغيير إعداد `tmdb_api_key` من أي مصدر.
+   *
+   * @param data - حمولة الحدث (تحتوي `key` و`value`).
+   */
+  private _onSettingsUpdated(data: { key?: string; value?: unknown }): void {
+    if (data?.key === "tmdb_api_key" && typeof data.value === "string") {
+      this.apiKey = data.value;
+    }
   }
 
   updateConfig(newConfig: Record<string, unknown>): void {
@@ -148,7 +257,9 @@ export class TmdbEnrichmentService extends EventEmitter {
     for (const [k, v] of Object.entries(params)) {
       if (v !== undefined && v !== null) url.searchParams.set(k, String(v));
     }
-    const res = await fetch(url.toString());
+    const res = await fetch(url.toString(), {
+      signal: AbortSignal.timeout(ENRICHMENT_FETCH_TIMEOUT_MS),
+    });
     if (!res.ok) {
       const text = await res.text().catch(() => "");
       throw new Error(`TMDB API error ${res.status}: ${text}`);
@@ -503,7 +614,9 @@ export class TmdbEnrichmentService extends EventEmitter {
       const targetDir = path.join(mediaDir, "metadata", "images");
       await fs.mkdir(targetDir, { recursive: true });
       const absolutePath = path.join(targetDir, filename);
-      const res = await fetch(imageUrl);
+      const res = await fetch(imageUrl, {
+        signal: AbortSignal.timeout(ENRICHMENT_FETCH_TIMEOUT_MS),
+      });
       if (!res.ok) throw new Error(`Failed to fetch image: ${res.statusText}`);
       const buffer = Buffer.from(await res.arrayBuffer());
       await fs.writeFile(absolutePath, buffer);
@@ -512,7 +625,16 @@ export class TmdbEnrichmentService extends EventEmitter {
 
     const storageRoot = await this._getStorageRoot();
     const storageDir = storageRoot.replace(/^\/+/, "");
-    const typeDir = label === "poster" ? "posters" : label === "backdrop" ? "backdrops" : "";
+
+    const typeDir =
+      label === "poster"
+        ? "posters"
+        : label === "backdrop"
+          ? "backdrops"
+          : label === "person"
+            ? "persons"
+            : "";
+
     const baseDir = path.isAbsolute(storageRoot)
       ? path.join(storageRoot, typeDir)
       : path.join(process.cwd(), "public", storageDir, typeDir);
@@ -531,13 +653,36 @@ export class TmdbEnrichmentService extends EventEmitter {
       /* proceed */
     }
 
-    const response = await fetch(imageUrl);
+    const response = await fetch(imageUrl, {
+      signal: AbortSignal.timeout(ENRICHMENT_FETCH_TIMEOUT_MS),
+    });
     if (!response.ok) throw new Error(`Failed to fetch image: ${response.statusText}`);
     const buffer = Buffer.from(await response.arrayBuffer());
     await fs.writeFile(absolutePath, buffer);
     return relativePath.replace(/\\/g, "/");
   }
 
+  /**
+   * يطبّق بيانات TMDB الكاملة على عنصر وسائط (تحديث الأعمدة + الأصناف + الطاقم
+   * + شركات الإنتاج + وقت المزامنة) داخل معاملة واحدة ثم يزامن صف فهرس البحث.
+   *
+   * كل الكتابات (update/refreshEnrichmentStatus/saveGenres/savePeople/
+   * saveProductionCompanies/updateCreditsSyncTime) تُنفَّذ داخل
+   * `runInWriterContext` + `withTransaction` (SAVEPOINT) بحيث أي فشل في منتصف
+   * العملية يسترجع كامل التغييرات بدل ترك حالة جزئية؛ وبعد نجاح المعاملة يُحدَّث
+   * `media_search` عبر `addToIndex` كي تصبح الأصناف والطاقم والمفتاح الصوتي
+   * الجديدة قابلة للبحث فوراً.
+   *
+   * تنزيل صور الطاقم (شبكة + قرص) يتم قبل فتح المعاملة: كان التنزيل داخل
+   * الـ SAVEPOINT يُمسك قفل الكتابة الوحيد (WAL) لثوانٍ لكل صورة، فتحت
+   * إثراءات الدفعات المتوازية (3 مهام) تتنافس كتابة سجل الأنشطة على الاتصال
+   * الرئيسي مع كاتب الماسح/الدفعة وتنتهي بـ `SQLITE_BUSY`.
+   *
+   * @param media - صف الوسائط الحالي (يتضمن `media_id` و`type` و`library_id`).
+   * @param detailsEn - بيانات TMDB بالإنجليزية (تحتوي credits والتصنيفات).
+   * @param detailsAr - بيانات TMDB بالعربية (overview/tagline/production_companies).
+   * @param options - خيارات الإثراء (تحميل الصور، وضع التخزين).
+   */
   private async _applyEnrichmentFromDetails(
     media: Record<string, unknown>,
     detailsEn: Record<string, unknown>,
@@ -623,14 +768,12 @@ export class TmdbEnrichmentService extends EventEmitter {
       }
     }
 
-    Object.keys(updateData).forEach((k) => updateData[k] === undefined && delete updateData[k]);
-    const filtered = await this._filterUpdateData(updateData);
-    await this.mediaRepo.update(media.media_id as number, filtered);
-    await this.mediaRepo.refreshEnrichmentStatus(media.media_id as number);
+    const mediaId = media.media_id as number;
 
-    const enGenres = ((detailsEn.genres as Array<{ name: string }>) || []).map((g) => g.name);
-    await this.enrichmentRepo.saveGenres(media.media_id as number, this._translateGenres(enGenres));
-
+    // بناء قائمة الطاقم وتنزيل صورهم خارج معاملة الكتابة: التنزيل الشبكي داخل
+    // الـ SAVEPOINT كان يمسك قفل الكتابة الوحيد (WAL) لثوانٍ لكل صورة
+    // (المصدر المباشر لـ `SQLITE_BUSY` على كتابة سجل الأنشطة تحت إثراء دفعات
+    // متوازية)، ونقل البناء قبل المعاملة يبقي الكتابات داخل معاملة قصيرة.
     const allPeople: Array<{
       person_id: number | null;
       name: string;
@@ -671,23 +814,100 @@ export class TmdbEnrichmentService extends EventEmitter {
         importance_order: allPeople.length + i,
       });
     }
-    await this.enrichmentRepo.savePeople(media.media_id as number, allPeople);
+    // تنزيل صور الأشخاص إذا كان الخيار مفعّلاً
+    if (options.downloadCastImages) {
+      for (const person of allPeople) {
+        if (person.profile_path && person.profile_path.startsWith("/")) {
+          try {
+            const localPath = await this._saveImage(
+              `https://image.tmdb.org/t/p/w500${person.profile_path}`,
+              media,
+              options.storageMode,
+              "person",
+            );
+            person.profile_path = localPath; // استبدال الرابط بالمسار المحلي
+          } catch (e) {
+            console.warn(`[Enrichment] Failed to download person image for ${person.name}:`, e);
+            // نُبقي الرابط الأصلي كفولباك
+          }
+        }
+      }
+    }
 
-    const companies =
-      ((detailsAr.production_companies || detailsEn.production_companies) as Array<{
-        name?: string;
-      }>) || [];
-    await this.enrichmentRepo.saveProductionCompanies(media.media_id as number, companies);
-    await this.enrichmentRepo.updateCreditsSyncTime(media.media_id as number);
+    await runInWriterContext(async () => {
+      await this.enrichmentRepo.withTransaction(async () => {
+        Object.keys(updateData).forEach((k) => updateData[k] === undefined && delete updateData[k]);
+        const filtered = await this._filterUpdateData(updateData);
+        await this.mediaRepo.update(mediaId, filtered);
+        await this.mediaRepo.refreshEnrichmentStatus(mediaId);
+
+        const enGenres = ((detailsEn.genres as Array<{ name: string }>) || []).map((g) => g.name);
+        await this.enrichmentRepo.saveGenres(mediaId, this._translateGenres(enGenres));
+
+        await this.enrichmentRepo.savePeople(mediaId, allPeople);
+
+        const companies =
+          ((detailsAr.production_companies || detailsEn.production_companies) as Array<{
+            name?: string;
+          }>) || [];
+        await this.enrichmentRepo.saveProductionCompanies(mediaId, companies);
+        await this.enrichmentRepo.updateCreditsSyncTime(mediaId);
+      });
+      await this.searchRepo.addToIndex(mediaId);
+    });
 
     this.emit("media:changed", { id: media.media_id, libraryId: media.library_id });
     getEventBus().emit("media:changed", { id: media.media_id, libraryId: media.library_id });
   }
 
+  /**
+   * يثري بيانات عنصر وسائط واحد من TMDB (بحث أو معرّف يدوي) ويعيد ملخص النتيجة.
+   *
+   * يبث حدث `metadata_completed` على حافلة الخدمة المحلية دائمًا، وعلى الحافلة
+   * العامة عندما يكون `emitGlobal` صحيحًا، كي يستطيع `CacheInvalidator` إبطال
+   * مفاتيح الكاش وتبقى الواجهة الإدارية متابعة للنتائج عبر SSE.
+   *
+   * كما يسجّل خطوات الإثراء في الكونسول عبر `logger` (أحداث `enrichment.item_*`):
+   * بدء المعالجة، نتيجة بحث TMDB مع درجة التشابه، النجاح، انتظار الموافقة،
+   * أو سبب الفشل — بما يتيح تشخيص فشل العناصر (مثل حالة فلتر «بلا محتوى»).
+   *
+   * @param id - معرّف عنصر الوسائط في قاعدة البيانات.
+   * @param options - خيارات الإثراء الجزئية (تُدمج مع الإعدادات المخزّنة).
+   * @param emitGlobal - هل يُبث الحدث على الحافلة العامة؟ يُمرَّر `false` من
+   * `enrichBatch` ليتجمّع بث النتائج في حدث واحد في نهاية الجلسة.
+   * @returns كائن الحالة: `success`، ومصدر النجاح أو رسالة الخطأ، والعنوان عند توفّره.
+   * قد يعيد `inProgress: true` إذا كان العنصر يُثرى حالياً من جلسة أخرى، أو
+   * `skipped: true` إذا كان ماسح مكتبات نشطاً (يتخطى الإثراء لتجنب تصادم قفل
+   * الكتابة WAL مع كاتب الماسح الذي يجمّد التطبيق).
+   */
   async enrichItem(
     id: number,
     options: Partial<EnrichmentOptions> = {},
+    emitGlobal = true,
   ): Promise<Record<string, unknown>> {
+    if (this.isScanActive()) {
+      const message = "Scan in progress, enrichment skipped";
+      this.emit("metadata_completed", { id, success: false, skipped: true, error: message });
+      if (emitGlobal) {
+        getEventBus().emit("metadata_completed", {
+          id,
+          success: false,
+          skipped: true,
+          error: message,
+        });
+      }
+      logger.warn("enrichment.item_skipped", { id, reason: "scan_active" });
+      return { success: false, skipped: true, error: message, title: null };
+    }
+    if (this.inFlightItems.has(id)) {
+      return {
+        success: false,
+        inProgress: true,
+        message: "Already being enriched",
+        title: null,
+      };
+    }
+    this.inFlightItems.add(id);
     const finalOptions = await this._getOptions(options);
     this.emit("metadata_started", { id, type: "single", options: finalOptions });
     getEventBus().emit("metadata_started", { id, type: "single", options: finalOptions });
@@ -699,6 +919,14 @@ export class TmdbEnrichmentService extends EventEmitter {
       if (!media) throw new Error("Media not found");
       currentMediaTitle = media.title as string;
 
+      logger.info("enrichment.item_started", {
+        id,
+        title: currentMediaTitle,
+        type: media.type,
+        year: media.year ?? null,
+        force: finalOptions.force,
+      });
+
       const excludedTypes = ["season", "episode", "series_sports", "series_deen"];
       if (excludedTypes.includes(media.type as string)) {
         this.emit("metadata_completed", {
@@ -707,12 +935,14 @@ export class TmdbEnrichmentService extends EventEmitter {
           error: `Type ${media.type} is excluded`,
           skipped: true,
         });
-        getEventBus().emit("metadata_completed", {
-          id,
-          success: false,
-          error: `Type ${media.type} is excluded`,
-          skipped: true,
-        });
+        if (emitGlobal) {
+          getEventBus().emit("metadata_completed", {
+            id,
+            success: false,
+            error: `Type ${media.type} is excluded`,
+            skipped: true,
+          });
+        }
         return {
           success: false,
           error: `Type ${media.type} is excluded`,
@@ -730,12 +960,14 @@ export class TmdbEnrichmentService extends EventEmitter {
           error: `In backoff for ${remaining}s`,
           skipped: true,
         });
-        getEventBus().emit("metadata_completed", {
-          id,
-          success: false,
-          error: `In backoff for ${remaining}s`,
-          skipped: true,
-        });
+        if (emitGlobal) {
+          getEventBus().emit("metadata_completed", {
+            id,
+            success: false,
+            error: `In backoff for ${remaining}s`,
+            skipped: true,
+          });
+        }
         return {
           success: false,
           error: `In backoff for ${remaining}s`,
@@ -768,11 +1000,33 @@ export class TmdbEnrichmentService extends EventEmitter {
           this.stats.totalEnriched++;
           this._logMetadataResult(id, currentMediaTitle, true);
           this.emit("metadata_completed", { id, success: true, source: "manual_tmdb_id" });
+          if (emitGlobal) {
+            getEventBus().emit("metadata_completed", {
+              id,
+              success: true,
+              source: "manual_tmdb_id",
+            });
+          }
+          logger.info("enrichment.item_success", {
+            id,
+            title: currentMediaTitle,
+            source: "manual_tmdb_id",
+          });
           return { success: true, source: "manual_tmdb_id", title: currentMediaTitle };
         }
       }
 
       tmdbResult = await this._searchTMDB(searchTitle, searchYear, tmdbType);
+
+      logger.info("enrichment.search_result", {
+        id,
+        searchTitle,
+        searchYear: searchYear ?? null,
+        tmdbType,
+        score: tmdbResult?.score ?? null,
+        resultId: tmdbResult?.result?.id ?? null,
+        resultTitle: tmdbResult ? tmdbResult.result.title || tmdbResult.result.name : null,
+      });
 
       if (tmdbResult) {
         const APPROVAL_THRESHOLD_LOW = 0.65;
@@ -795,14 +1049,22 @@ export class TmdbEnrichmentService extends EventEmitter {
             detailsEn,
             tmdbResult: tmdbResult.result,
           });
-          await this.approvalRepo.createApproval(
-            id,
-            currentMediaTitle,
-            tmdbResult.result.id as number,
-            (tmdbResult.result.title || tmdbResult.result.name) as string,
-            tmdbResult.score,
-            detailsJson,
+          const mediaTitle = currentMediaTitle ?? "";
+          await runInWriterContext(() =>
+            this.approvalRepo.createApproval(
+              id,
+              mediaTitle,
+              tmdbResult.result.id as number,
+              (tmdbResult.result.title || tmdbResult.result.name) as string,
+              tmdbResult.score,
+              detailsJson,
+            ),
           );
+          logger.warn("enrichment.item_pending_approval", {
+            id,
+            title: currentMediaTitle,
+            score: tmdbResult.score,
+          });
           this.emit("metadata_completed", {
             id,
             success: false,
@@ -810,6 +1072,15 @@ export class TmdbEnrichmentService extends EventEmitter {
             message: "Awaiting user approval",
             similarityScore: tmdbResult.score,
           });
+          if (emitGlobal) {
+            getEventBus().emit("metadata_completed", {
+              id,
+              success: false,
+              pending: true,
+              message: "Awaiting user approval",
+              similarityScore: tmdbResult.score,
+            });
+          }
           return {
             success: false,
             pending: true,
@@ -844,14 +1115,24 @@ export class TmdbEnrichmentService extends EventEmitter {
       this.stats.totalEnriched++;
       this._logMetadataResult(id, currentMediaTitle, true);
       this.emit("metadata_completed", { id, success: true, source: "tmdb" });
+      if (emitGlobal) {
+        getEventBus().emit("metadata_completed", { id, success: true, source: "tmdb" });
+      }
+      logger.info("enrichment.item_success", { id, title: currentMediaTitle, source: "tmdb" });
       return { success: true, source: "tmdb", title: currentMediaTitle };
     } catch (error) {
       this._recordFailure(id, null);
       this.stats.failed++;
       const msg = error instanceof Error ? error.message : String(error);
+      logger.error("enrichment.item_failed", { id, title: currentMediaTitle, error: msg });
       this._logMetadataResult(id, currentMediaTitle, false, msg);
       this.emit("metadata_completed", { id, success: false, error: msg });
+      if (emitGlobal) {
+        getEventBus().emit("metadata_completed", { id, success: false, error: msg });
+      }
       return { success: false, error: msg, title: String(id) };
+    } finally {
+      this.inFlightItems.delete(id);
     }
   }
 
@@ -859,6 +1140,11 @@ export class TmdbEnrichmentService extends EventEmitter {
    * Persists a metadata enrichment outcome (success or failure) into the
    * `activities` table as a system event so the admin events page can show
    * "تم تحديث بيانات العنصر ... بنجاح" / "خطأ في تحديث بيانات العنصر ...".
+   *
+   * الكتابة تُنفَّذ داخل `runInWriterContext` (اتصال الكاتب) بحيث لا تلمس
+   * الإثراءُ الاتصالَ الرئيسي الذي تخدمه كل طلبات HTTP؛ كان تنفيذها عليه
+   * يصطدم بقفل الكاتب WAL فيحجب الاتصال الرئيسي 30–90 ثانية (تجميد التطبيق
+   * الكامل). وتُتخطى الكتابة أثناء مسح نشط لتجنب زيادة الحمل على كاتب الماسح.
    *
    * @param mediaId - The enriched media item id.
    * @param title - The media item title (nullable when only the id is known).
@@ -871,24 +1157,30 @@ export class TmdbEnrichmentService extends EventEmitter {
     success: boolean,
     error?: string,
   ): void {
-    if (!this.activityRepo) return;
-    void this.activityRepo
-      .logActivity({
-        entityType: "system",
-        action: "metadata_update",
-        module: "enrichment",
-        severity: success ? "success" : "error",
-        targetId: mediaId,
-        details: { mediaId, title, success, error: error ?? null },
-      })
-      .catch((err: Error) => {
-        console.error("[TmdbEnrichmentService] Failed to log metadata result:", err.message);
-      });
+    const repo = this.activityRepo;
+    if (!repo || this.isScanActive()) return;
+    void runInWriterContext(() =>
+      repo
+        .logActivity({
+          entityType: "system",
+          action: "metadata_update",
+          module: "enrichment",
+          severity: success ? "success" : "error",
+          targetId: mediaId,
+          details: { mediaId, title, success, error: error ?? null },
+        })
+        .catch((err: Error) => {
+          console.error("[TmdbEnrichmentService] Failed to log metadata result:", err.message);
+        }),
+    );
   }
 
   /**
    * يسجّل قرار اعتماد/رفض اقتراح إثراء في سجل الأنشطة بأمان: أي فشل في التسجيل
    * يُطبَع فقط ولا يعطّل عملية الموافقة نفسها.
+   *
+   * مثل `_logMetadataResult` تُنفَّذ الكتابة داخل `runInWriterContext` (اتصال
+   * الكاتب) وتُتخطى أثناء مسح نشط — لحماية الاتصال الرئيسي من تصادم قفل WAL.
    *
    * @param action - إجراء النظام (`enrichment_approved` | `enrichment_approval_failed` | `enrichment_rejected`).
    * @param details - تفاصيل القرار (معرّف الاقتراح والعنصر).
@@ -899,24 +1191,47 @@ export class TmdbEnrichmentService extends EventEmitter {
     details: Record<string, unknown>,
     severity: "success" | "info" | "error",
   ): void {
-    if (!this.activityRepo) return;
-    void this.activityRepo
-      .logActivity({
-        entityType: "system",
-        action,
-        module: "enrichment",
-        severity,
-        details,
-      })
-      .catch((err: Error) => {
-        console.error(`[TmdbEnrichmentService] Failed to log ${action}:`, err.message);
-      });
+    const repo = this.activityRepo;
+    if (!repo || this.isScanActive()) return;
+    void runInWriterContext(() =>
+      repo
+        .logActivity({
+          entityType: "system",
+          action,
+          module: "enrichment",
+          severity,
+          details,
+        })
+        .catch((err: Error) => {
+          console.error(`[TmdbEnrichmentService] Failed to log ${action}:`, err.message);
+        }),
+    );
   }
 
   cancelSession(sessionId: string): void {
     this.cancelledSessions.add(sessionId);
   }
 
+  /**
+   * يثري مجموعة عناصر وسائط بحد أقصى 3 مهام متزامنة، مع تتبّع التقدم لكل عنصر
+   * وبث حدث واحد مجمّع من `metadata_completed` في النهاية.
+   *
+   * يُكتم البث العام للأحداث الفردية (عبر `emitGlobal=false`) ثم يبث الحدث
+   * المجمّع على الحافلة العامة مع `success` كي يقرّر `CacheInvalidator` إبطال
+   * الكاش مرة واحدة للجلسة كاملة بدلًا من N عملية إبطال متوازية.
+   *
+   * يسجّل بداية ونهاية الجلسة في الكونسول عبر `logger`
+   * (حدثا `enrichment.batch_started` و`enrichment.batch_completed`).
+   *
+   * يتخطى الجلسة كاملةً ويعيد `skipped: true` إذا كان ماسح مكتبات نشطاً —
+   * يمنع تصادم كاتب الإثراء مع كاتب الماسح على قفل الكتابة WAL الوحيد
+   * (المصدر الرئيسي لتجميد التطبيق). العناصر التي يتخطاها الحارس الفردي
+   * (إذا بدأ مسح أثناء جلسة قائمة) تُحتسب في `skipped` لا `failed`.
+   *
+   * @param ids - قائمة معرّفات عناصر الوسائط المراد إثراؤها.
+   * @param options - خيارات الإثراء مع معرّف جلسة اختياري ودالة تقدم اختيارية.
+   * @returns إحصاءات الجلسة: `successful`، `failed`، `pending`، `skipped`، `total`.
+   */
   async enrichBatch(
     ids: number[],
     options: Partial<EnrichmentOptions> & {
@@ -927,19 +1242,51 @@ export class TmdbEnrichmentService extends EventEmitter {
     const finalOptions = await this._getOptions(options);
     const { sessionId = null, onProgress = null } = options;
     const total = ids.length;
+    if (this.isScanActive()) {
+      const skippedPayload = {
+        sessionId,
+        ids,
+        total,
+        successful: 0,
+        failed: 0,
+        pending: 0,
+        skipped: total,
+        success: false,
+      };
+      this.emit("metadata_completed", skippedPayload);
+      getEventBus().emit("metadata_completed", skippedPayload);
+      logger.warn("enrichment.batch_skipped", { sessionId, total, reason: "scan_active" });
+      return { successful: 0, failed: 0, pending: 0, skipped: total, total };
+    }
     const limit = pLimit(3);
-    const tracker: BatchTracker = { successful: 0, failed: 0, pending: 0, processed: 0 };
+    const tracker: BatchTracker = {
+      successful: 0,
+      failed: 0,
+      pending: 0,
+      skipped: 0,
+      processed: 0,
+    };
+
+    logger.info("enrichment.batch_started", { sessionId, total });
 
     this.emit("metadata_started", { sessionId, ids, total, type: "batch", options: finalOptions });
+    getEventBus().emit("metadata_started", {
+      sessionId,
+      ids,
+      total,
+      type: "batch",
+      options: finalOptions,
+    });
 
     await Promise.all(
       ids.map((id) =>
         limit(async () => {
           if (sessionId && this.cancelledSessions.has(sessionId)) return;
-          const result = await this.enrichItem(id, finalOptions);
+          const result = await this.enrichItem(id, finalOptions, false);
           tracker.processed++;
           if (result.success) tracker.successful++;
           else if (result.pending) tracker.pending++;
+          else if (result.skipped) tracker.skipped++;
           else tracker.failed++;
           const progress = {
             sessionId,
@@ -951,6 +1298,7 @@ export class TmdbEnrichmentService extends EventEmitter {
             successful: tracker.successful,
             failed: tracker.failed,
             pending: tracker.pending,
+            skipped: tracker.skipped,
           };
           this.emit("enrichment_progress", progress);
           if (onProgress) onProgress(progress);
@@ -965,11 +1313,32 @@ export class TmdbEnrichmentService extends EventEmitter {
       successful: tracker.successful,
       failed: tracker.failed,
       pending: tracker.pending,
+      skipped: tracker.skipped,
+      success: tracker.successful > 0,
+    });
+    getEventBus().emit("metadata_completed", {
+      sessionId,
+      ids,
+      total,
+      successful: tracker.successful,
+      failed: tracker.failed,
+      pending: tracker.pending,
+      skipped: tracker.skipped,
+      success: tracker.successful > 0,
+    });
+    logger.info("enrichment.batch_completed", {
+      sessionId,
+      total,
+      successful: tracker.successful,
+      failed: tracker.failed,
+      pending: tracker.pending,
+      skipped: tracker.skipped,
     });
     return {
       successful: tracker.successful,
       failed: tracker.failed,
       pending: tracker.pending,
+      skipped: tracker.skipped,
       total,
     };
   }
@@ -1057,7 +1426,7 @@ export class TmdbEnrichmentService extends EventEmitter {
     try {
       const finalOptions = await this._getOptions(options);
       await this._applyEnrichmentFromDetails(media, detailsEn, detailsAr, finalOptions);
-      await this.approvalRepo.updateStatus(approvalId, "approved");
+      await runInWriterContext(() => this.approvalRepo.updateStatus(approvalId, "approved"));
       this._logSystemEvent(
         "enrichment_approved",
         { approvalId, mediaId: media.media_id, title: media.title ?? null },
@@ -1065,7 +1434,7 @@ export class TmdbEnrichmentService extends EventEmitter {
       );
       return { success: true, message: "Enrichment applied" };
     } catch (err) {
-      await this.approvalRepo.updateStatus(approvalId, "failed");
+      await runInWriterContext(() => this.approvalRepo.updateStatus(approvalId, "failed"));
       this._logSystemEvent(
         "enrichment_approval_failed",
         { approvalId, mediaId: media.media_id, error: (err as Error).message },
@@ -1076,7 +1445,7 @@ export class TmdbEnrichmentService extends EventEmitter {
   }
 
   async rejectEnrichment(approvalId: number): Promise<Record<string, unknown>> {
-    await this.approvalRepo.updateStatus(approvalId, "rejected");
+    await runInWriterContext(() => this.approvalRepo.updateStatus(approvalId, "rejected"));
     this._logSystemEvent("enrichment_rejected", { approvalId }, "info");
     return { success: true };
   }
@@ -1103,10 +1472,24 @@ export class TmdbEnrichmentService extends EventEmitter {
     return { count: successCount, failed: failCount, total: pending.length };
   }
 
+  /**
+   * يعيد ضبط بيانات الإثراء لعنصر وسائط (حقول TMDB والأصناف والطاقم).
+   *
+   * يُنفَّذ الحذف ثم إعادة توليف صف `media_search` داخل `runInWriterContext`
+   * حتى يبقى فهرس البحث متزامناً مع الحالة بعد الإعادة (بدل بقاء أنقاض
+   * الأصناف/الطاقم القديمة في صف الفهرس).
+   *
+   * @param mediaId - معرّف عنصر الوسائط.
+   * @returns كائن الحالة مع رسالة النجاح.
+   * @throws خطأً إذا لم يوجد العنصر.
+   */
   async resetItemMetadata(mediaId: number): Promise<Record<string, unknown>> {
     const media = (await this.mediaRepo.getById(mediaId)) as Record<string, unknown> | null;
     if (!media) throw new Error("Media not found");
-    await this.enrichmentRepo.resetEnrichment(mediaId);
+    await runInWriterContext(async () => {
+      await this.enrichmentRepo.resetEnrichment(mediaId);
+      await this.searchRepo.addToIndex(mediaId);
+    });
     this.emit("media:changed", { id: mediaId, libraryId: media.library_id });
     return { success: true, message: "Enrichment data reset" };
   }
@@ -1128,14 +1511,16 @@ export class TmdbEnrichmentService extends EventEmitter {
     const updateData: Record<string, unknown> = { last_metadata_sync: new Date().toISOString() };
     if (type === "poster") updateData.enriched_poster = savedPath;
     else updateData.enriched_backdrop = savedPath;
-    await this.mediaRepo.update(mediaId, updateData);
+    await runInWriterContext(() => this.mediaRepo.update(mediaId, updateData));
     this.emit("media:changed", { id: mediaId, libraryId: media.library_id });
     return { success: true, path: savedPath, type };
   }
 
   async testApiKey(apiKey: string): Promise<Record<string, unknown>> {
     const url = `${this.TMDB_BASE_URL}/movie/550?api_key=${apiKey}`;
-    const res = await fetch(url);
+    const res = await fetch(url, {
+      signal: AbortSignal.timeout(ENRICHMENT_FETCH_TIMEOUT_MS),
+    });
     if (!res.ok) throw new Error(`TMDB API key test failed: ${res.status}`);
     return res.json() as Promise<Record<string, unknown>>;
   }

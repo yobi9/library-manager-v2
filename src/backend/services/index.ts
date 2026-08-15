@@ -61,7 +61,38 @@ import { RetentionScheduler } from "./retention-scheduler";
 import { LiveStreamService } from "./live-stream-service";
 import { LicenseService } from "./license-service";
 
-let _services: ReturnType<typeof createServices> | null = null;
+/** مفتاح تخزين حالة الخدمات على `globalThis`. */
+const SERVICES_STATE_KEY = "__libraryManagerServicesState";
+
+const globalServicesState = (globalThis as Record<string, unknown>)[SERVICES_STATE_KEY] as
+  ReturnType<typeof createServices> | null | undefined;
+
+let _services: ReturnType<typeof createServices> | null = globalServicesState ?? null;
+
+/**
+ * إنشاء/استرجاع حالة الخدمات المشتركة.
+ *
+ * تُحفظ على `globalThis` بدل حالة الوحدة لأن Turbopack (وضع التطوير) يعيد
+ * تقييم الوحدة عند كل إعادة ترجمة (نفس السبب الموثّق في `db.ts`). لو بقيت
+ * الحالة على مستوى الوحدة لاستُدعيت `createServices()` مرة لكل إعادة تقييم
+ * فتتضاعف المجدوِلات ومؤقّتات الخلفية (`RetentionScheduler` كل 5 دقائق + 24
+ * ساعة، `AutoBackupScheduler`، مؤقّتات `AuthService` و`CacheService` وخدمة
+ * الإثراء) وتبدأ كلها بالعمل معاً في دفعات — مصدر تكرار
+ * `background_job.started ... jobName=retentionCleanup` في السجلات.
+ *
+ * @remarks
+ * أثر جانبي مقصود: تغييرات كود الخدمات في وضع التطوير لن تُطبَّق قبل إعادة
+ * تشغيل الخادم كاملة (سلوك مقبول سلفاً لطبقة قاعدة البيانات في هذا المشروع).
+ *
+ * @returns كائن الخدمات الوحيد للعملية الحالية.
+ */
+export function getServices() {
+  if (!_services) {
+    _services = createServices();
+    (globalThis as Record<string, unknown>)[SERVICES_STATE_KEY] = _services;
+  }
+  return _services;
+}
 
 function createServices() {
   const userRepo = new UserRepository();
@@ -114,7 +145,7 @@ function createServices() {
     activityRepo,
     searchRepo,
   );
-  const searchService = new SearchService(searchRepo, cacheService);
+  const searchService = new SearchService(searchRepo, cacheService, () => scanActivity.isActive());
   const settingsService = new SettingsService(settingsRepo, cacheService);
   const activityService = new ActivityService(activityRepo);
   const securityService = new SecurityService(securityRepo);
@@ -128,7 +159,9 @@ function createServices() {
     cacheService,
   );
   const translationCacheService = new TranslationCacheService(translationCacheRepo);
-  const databaseService = new DatabaseService(activityRepo, cacheService);
+  const databaseService = new DatabaseService(activityRepo, cacheService, () =>
+    scanActivity.isActive(),
+  );
   const imageService = new ImageService(imageRepo, settingsService);
   const newsService = new NewsService(newsRepo, activityRepo);
   const messagesService = new MessagesService(messagesRepo, activityRepo);
@@ -140,12 +173,25 @@ function createServices() {
     mediaRepo,
     libraryRepo,
     enrichmentApprovalRepo,
+    searchRepo,
     "",
     {},
     activityRepo,
     settingsService,
+    () => scanActivity.isActive(),
   );
-  const metadataService = new MetadataService(mediaRepo, enrichmentMediaRepo, activityRepo);
+  const metadataService = new MetadataService(
+    mediaRepo,
+    enrichmentMediaRepo,
+    searchRepo,
+    activityRepo,
+  );
+  // تحميل مفتاح TMDB المحفوظ في الإعدادات عند بدء الخدمة (J4) — بدونه يفقد
+  // المفتاح بعد إعادة تشغيل الخادم لأنه كان يُضبط في الذاكرة فقط. يُشغَّل
+  // كخلفية فلا يحجب اكتمال تهيئة باقي الخدمات.
+  void tmdbEnrichmentService.loadApiKeyFromSettings().catch((err: Error) => {
+    void errorHandler.logError(err, { module: "EnrichmentApiKey" });
+  });
   const snapshotRepo = new SnapshotRepository();
   const scanner = new ScanOrchestrator(
     mediaRepo,
@@ -155,7 +201,7 @@ function createServices() {
       maxDepth: 8,
       batchDelayMs: 0,
       enableFileScan: true,
-      batchSize: 50,             // ← was 200
+      batchSize: 50, // ← was 200
       strictHierarchy: false,
     },
     undefined,
@@ -238,7 +284,9 @@ function createServices() {
   const viewEventPublisher = new ViewEventPublisher(activityRepo, eventBus, mediaRepo);
   const viewService = new ViewService(viewTracker, viewEventPublisher);
 
-  const autoBackupScheduler = new AutoBackupScheduler(databaseService, settingsService);
+  const autoBackupScheduler = new AutoBackupScheduler(databaseService, settingsService, () =>
+    scanActivity.isActive(),
+  );
   void autoBackupScheduler.start().catch((err) => {
     logger.error("autobackup.start_failed", {
       message: err instanceof Error ? err.message : String(err),
@@ -299,13 +347,6 @@ function createServices() {
     liveStream: liveStreamService,
     license: licenseService,
   };
-}
-
-export function getServices() {
-  if (!_services) {
-    _services = createServices();
-  }
-  return _services;
 }
 
 export type Services = ReturnType<typeof getServices>;
