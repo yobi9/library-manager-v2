@@ -76,7 +76,7 @@ export function ItemsControlToolbar({
     {
       label: "يحتاج مراجعة",
       value: stats?.needsAttention ?? "—",
-      icon: <CircleAlert className="h-4 w-4 text-amber-500" />,
+      icon: <CircleAlert className="h-4 w-4 text-warning-text" />,
     },
     {
       label: "بلا محتوى",

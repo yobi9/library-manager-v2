@@ -42,6 +42,22 @@ export const MERGABLE_ROOT_TYPES = new Set([
 
 export { normalizeTitle };
 
+/**
+ * استعلام فرعي يرافق عمود `media_id` ويعيد تصنيفات العنصر (`media_genres`)
+ * بصيغة JSON array نصية (مثل `["Action","Drama"]`) عبر `json_group_array`.
+ *
+ * @remarks يُحقن في استعلامات قوائم الوسائط حتى تصل كل بطاقة بحقل `genres`
+ *          جاهزاً للتحليل بـ `extractGenres` في الواجهة (التي تنفّذ
+ *          `JSON.parse` على القيم النصية). يتبع نفس نمط `search-repository`
+ *          في دمج التصنيفات لكن مع مخرجات JSON صالحة. عند غياب التصنيفات
+ *          يعود `[]` بدلاً من `NULL` لتوحيد شكل الـ API.
+ */
+const GENRES_SUBQUERY = `COALESCE((
+  SELECT json_group_array(mg.genre)
+  FROM media_genres mg
+  WHERE mg.media_id = m.media_id
+), '[]') AS genres`;
+
 export class MediaRepository extends BaseRepository {
   constructor() {
     super("media_items");
@@ -325,8 +341,12 @@ export class MediaRepository extends BaseRepository {
   }
 
   async getPinnedItems() {
-    return this.query(
-      "SELECT * FROM media_items WHERE is_pinned = 1 AND is_available = 1 AND parent_media_id IS NULL ORDER BY sort_order, title",
+    const db = await getDatabase();
+    return db.all(
+      `SELECT m.*, ${GENRES_SUBQUERY}
+       FROM media_items m
+       WHERE m.is_pinned = 1 AND m.is_available = 1 AND m.parent_media_id IS NULL
+       ORDER BY m.sort_order, m.title`,
     );
   }
 
@@ -334,14 +354,18 @@ export class MediaRepository extends BaseRepository {
     const db = await getDatabase();
     if (type) {
       return db.all(
-        `SELECT * FROM media_items WHERE type = ? AND is_available = 1 AND parent_media_id IS NULL
-         ORDER BY created_at DESC LIMIT ?`,
+        `SELECT m.*, ${GENRES_SUBQUERY}
+         FROM media_items m
+         WHERE m.type = ? AND m.is_available = 1 AND m.parent_media_id IS NULL
+         ORDER BY m.created_at DESC LIMIT ?`,
         [type, limit],
       );
     }
     return db.all(
-      `SELECT * FROM media_items WHERE is_available = 1 AND parent_media_id IS NULL
-       ORDER BY created_at DESC LIMIT ?`,
+      `SELECT m.*, ${GENRES_SUBQUERY}
+       FROM media_items m
+       WHERE m.is_available = 1 AND m.parent_media_id IS NULL
+       ORDER BY m.created_at DESC LIMIT ?`,
       [limit],
     );
   }
@@ -373,25 +397,33 @@ export class MediaRepository extends BaseRepository {
     return newVal;
   }
 
-  async getRecommendations(mediaId: number, libraryId: number, type?: string, limit = 20) {
-    const db = await getDatabase();
-    let sql = `SELECT * FROM media_items WHERE library_id = ? AND media_id != ? AND is_available = 1`;
-    const params: unknown[] = [libraryId, mediaId];
-    if (type) {
-      sql += ` AND type = ?`;
-      params.push(type);
-    }
-    sql += ` ORDER BY imdb_rating DESC, created_at DESC LIMIT ?`;
-    params.push(limit);
-    return db.all(sql, params);
+ async getRecommendations(mediaId: number, libraryId: number, type?: string, limit = 20) {
+  const db = await getDatabase();
+  let sql = `SELECT m.*, ${GENRES_SUBQUERY}
+             FROM media_items m
+             WHERE m.library_id = ?
+               AND m.media_id != ?
+               AND m.is_available = 1
+               AND m.parent_media_id IS NULL
+               AND m.type NOT IN ('season', 'episode')`;
+  const params: unknown[] = [libraryId, mediaId];
+  if (type) {
+    sql += ` AND m.type = ?`;
+    params.push(type);
   }
+  sql += ` ORDER BY m.imdb_rating DESC, m.created_at DESC LIMIT ?`;
+  params.push(limit);
+  return db.all(sql, params);
+}
 
   async batchGetByIds(ids: (number | string)[]) {
     if (!ids.length) return [];
     const db = await getDatabase();
     const placeholders = ids.map(() => "?").join(",");
     return db.all(
-      `SELECT * FROM media_items WHERE media_id IN (${placeholders}) AND is_available = 1`,
+      `SELECT m.*, ${GENRES_SUBQUERY}
+       FROM media_items m
+       WHERE m.media_id IN (${placeholders}) AND m.is_available = 1`,
       ids,
     );
   }
@@ -470,7 +502,8 @@ export class MediaRepository extends BaseRepository {
     const orderDir = options.sortOrder ?? "DESC";
 
     const items = await db.all(
-      `SELECT m.* FROM media_items m ${where} ORDER BY ${orderCol} ${orderDir} LIMIT ? OFFSET ?`,
+      `SELECT m.*, ${GENRES_SUBQUERY}
+       FROM media_items m ${where} ORDER BY ${orderCol} ${orderDir} LIMIT ? OFFSET ?`,
       [...params, limit, offset],
     );
 
@@ -565,7 +598,8 @@ export class MediaRepository extends BaseRepository {
   async getPersonWorks(personId: number) {
     const db = await getDatabase();
     return db.all(
-      `SELECT m.* FROM media_items m
+      `SELECT m.*, ${GENRES_SUBQUERY}
+       FROM media_items m
        JOIN media_people mp ON m.media_id = mp.media_id
        WHERE mp.person_id = ? AND m.is_available = 1
        GROUP BY m.media_id
@@ -746,7 +780,8 @@ export class MediaRepository extends BaseRepository {
     )) as { count: number };
 
     const items = await db.all(
-      `SELECT m.* FROM media_items m ${whereClause}
+      `SELECT m.*, ${GENRES_SUBQUERY}
+       FROM media_items m ${whereClause}
        ORDER BY m.created_at DESC LIMIT ? OFFSET ?`,
       [...queryParams, limit, offset],
     );

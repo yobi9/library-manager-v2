@@ -31,7 +31,7 @@ const SECTIONS: Array<{ type: string; title: string; iconKey: string; settingsKe
   { type: "movie", title: "أحدث الأفلام", iconKey: "movie", settingsKey: "show_movie" },
   { type: "series", title: "أحدث المسلسلات", iconKey: "series", settingsKey: "show_series" },
   { type: "series_anime", title: "أحدث الأنمي", iconKey: "series", settingsKey: "show_series_anime" },
-  { type: "series_kids", title: "أحدث أفلام الكرتون", iconKey: "series", settingsKey: "show_series_kids" },
+  { type: "series_kids", title: "أحدث مسلسلات الاطفال", iconKey: "series", settingsKey: "show_series_kids" },
   { type: "series_sports", title: "أحدث الرياضة", iconKey: "series", settingsKey: "show_series_sports" },
   { type: "series_tv", title: "أحدث البرامج التلفزيونية", iconKey: "series", settingsKey: "show_series_tv" },
   { type: "series_ramadan", title: "أحدث المسلسلات الرمضانية", iconKey: "series", settingsKey: "show_series_ramadan" },
@@ -74,6 +74,7 @@ export function EnabledTypeSections({
 
   return (
     <>
+     
       {enabledSections.map((section) => (
         <TypeSectionSlider
           key={section.type}
@@ -82,6 +83,7 @@ export function EnabledTypeSections({
           iconKey={section.iconKey}
         />
       ))}
+      
     </>
   );
 }

@@ -102,6 +102,10 @@ export class SettingsService {
     const defaults = getDefaultSettings();
     for (const [key, value] of Object.entries(defaults)) {
       await this.settingsRepo.upsertSetting(key, value);
+      // إطلاق نفس حدث `settings_updated` الذي يطلقه `updateSettings` حتى تعيد
+      // الخدمات المؤثرة (مثل ImageService لمسار `image_storage_root` و
+      // `AutoBackupScheduler`) ضبط نفسها فوراً دون انتظار إعادة تشغيل الخادم.
+      getEventBus().emit("settings_updated", { key, value });
     }
     const stored = await this.settingsRepo.getAllSettings();
     for (const storedKey of Object.keys(stored)) {

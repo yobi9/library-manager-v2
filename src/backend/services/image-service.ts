@@ -1,5 +1,8 @@
 import { ImageRepository } from "../repositories/image-repository";
 import { SettingsService } from "./settings-service";
+import { getEventBus } from "./event-bus";
+import { logger } from "../observability/logger";
+import { ensureDirs, isAbsoluteDiskPath } from "../utils/path-utils";
 import fs from "fs/promises";
 import path from "path";
 import sharp from "sharp";
@@ -51,11 +54,71 @@ const CACHE_MAX_ENTRIES = 1000;
 export class ImageService {
   private readonly memoryCache = new Map<string, CacheEntry>();
   private readonly inflight = new Map<string, Promise<{ buffer: Buffer; contentType: string }>>();
+  private unsubscribe: (() => void) | null = null;
 
   constructor(
     private imageRepo: ImageRepository,
     private settingsService?: SettingsService,
-  ) {}
+  ) {
+    // عند تغيير `image_storage_root` (من لوحة التحكم أو إعادة ضبط الإعدادات)
+    // تُعاد إنشاء المجلدات فوراً في المسار الجديد دون إعادة تشغيل الخادم.
+    this.unsubscribe = getEventBus().on("settings_updated", (data) => {
+      const payload = data as { key?: string; value?: unknown };
+      if (payload?.key === "image_storage_root") {
+        void this.ensureDirectories();
+      }
+    });
+
+    // إنشاء مجلدات تخزين صور الإثراء عند بدء التشغيل (أول بناء للخدمة) —
+    // أي فشل يُسجَّل فقط ولا يعطّل تهيئة باقي الخدمات.
+    void this.ensureDirectories();
+  }
+
+  /**
+   * يضمن وجود مجلدات تخزين صور الإثراء (الأساسي + posters/backdrops/persons)
+   * في المسار المُعرَّف في إعداد `image_storage_root`.
+   *
+   * - المسار المطلق الحقيقي (`D:\...` / `\\server\...`) يُنشأ كما هو؛ والمسار
+   *   web-relative (يبدأ بـ `/`) يُحل داخل مجلد `public` — مطابق لمنطق
+   *   `resolveImagePath` كي لا تتباعد الكتابة عن القراءة.
+   * - السلوك: لا يرمي الخطأ أبداً — الفشل يُسجَّل عبر `logger` فقط حتى لا
+   *   يُعطِّل تشغيل الخدمة أو التطبيق.
+   *
+   * @returns وعد ينجز عند ضمان وجود المجلدات (أو تسجيل الفشل).
+   */
+  async ensureDirectories(): Promise<void> {
+    try {
+      const storageRoot = await this.getSettingString("image_storage_root", ENRICHED_WEB_PREFIX);
+      const baseDir = isAbsoluteDiskPath(storageRoot)
+        ? storageRoot
+        : path.join(process.cwd(), "public", storageRoot.replace(/^\/+/, ""));
+      await ensureDirs(
+        [
+          baseDir,
+          path.join(baseDir, "posters"),
+          path.join(baseDir, "backdrops"),
+          path.join(baseDir, "persons"),
+        ],
+        "ImageService",
+      );
+    } catch (err) {
+      logger.error("image.dirs_ensure_failed", {
+        message: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  /**
+   * يفكّ اشتراك الخدمة في أحداث `settings_updated` (للاستخدام في الاختبارات
+   * أو عند إعادة التحميل الساخن). بعد الاستدعاء تصبح الخدمة خاملة تجاه
+   * تغييرات الإعدادات.
+   */
+  dispose(): void {
+    if (this.unsubscribe) {
+      this.unsubscribe();
+      this.unsubscribe = null;
+    }
+  }
 
   /**
    * قراءة إعداد نصي مع قيمة احتياطية عند غياب الخدمة أو المفتاح.
@@ -395,19 +458,6 @@ export class ImageService {
   }
 
   /**
-   * يكتشف ما إذا كان المسار المخزَّن مسار قرص مطلقاً حقيقياً (محرك + فاصل، أو
-   * مشاركة شبكة UNC) وليس مساراً web-relative يبدأ بـ `/` — ففي Node على ويندوز
-   * `path.isAbsolute("/assets/...")` يُرجع `true` لأنه يعامله كمستوٍ على جذر
-   * المحرك، لذا لا يصح الاعتماد عليه لتمييز مسارات القرص من المسارات الويب.
-   *
-   * @param storedPath - مسار الصورة كما هو محفوظ في قاعدة البيانات.
-   * @returns `true` عندما يكون المسار مطلقاً على القرص (`C:\...` / `\\server\...`).
-   */
-  private isAbsoluteDiskPath(storedPath: string): boolean {
-    return /^[A-Za-z]:[\\/]/.test(storedPath) || /^[\\/]{2}/.test(storedPath);
-  }
-
-  /**
    * يحوّل مسار صورة مخزّن في قاعدة البيانات إلى مسار قرص صالح للقراءة.
    *
    * - المسار المطلق الحقيقي (`\\server\...` أو `C:\...`) يُقرأ كما هو.
@@ -426,7 +476,7 @@ export class ImageService {
    * @returns مسار قرص مطلق/صالح للقراءة.
    */
   private async resolveImagePath(storedPath: string): Promise<string> {
-    if (this.isAbsoluteDiskPath(storedPath)) return storedPath;
+    if (isAbsoluteDiskPath(storedPath)) return storedPath;
 
     const storageRoot = await this.getSettingString("image_storage_root", ENRICHED_WEB_PREFIX);
 

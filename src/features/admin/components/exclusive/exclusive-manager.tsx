@@ -198,7 +198,7 @@ export function ExclusiveManager() {
                                 className={cn(
                                   "h-3 w-3",
                                   star <= (item.rating ?? 0)
-                                    ? "fill-yellow-400 text-yellow-400"
+                                    ? "fill-rating-star text-rating-star"
                                     : "text-muted-foreground",
                                 )}
                               />

@@ -521,7 +521,7 @@ export function LibrariesPage() {
               return (
                 <label
                   key={section.id}
-                  className="border-border bg-admin-bg-background flex items-center justify-between rounded-lg border px-3 py-2"
+                  className="border-border bg-card flex items-center justify-between rounded-lg border px-3 py-2"
                 >
                   <div className="flex flex-col">
                     <span className="text-foreground text-sm font-bold">{section.label}</span>
@@ -538,8 +538,6 @@ export function LibrariesPage() {
           </div>
         )}
       </div>
-      {/* ===== قسم إدارة المكتبات مع خلفية مميزة ===== */}
-      {/* <div className="rounded-lg border border-border bg-card p-4 space-y-4 shadow-card"> */}
       {/* ===== قسم إدارة المكتبات – تأثير طفو مع ظل ===== */}
       <div className="bg-secondary shadow-card hover:shadow-hover space-y-4 rounded-lg p-4 transition-shadow">
         {/* شريط العنوان والأزرار */}

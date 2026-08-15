@@ -248,7 +248,9 @@ export function LibraryForm({
 
   return (
     <Modal open={open} onOpenChange={onOpenChange}>
-      <ModalContent className="admin-layout   w-full max-w-sm   sm:max-w-md md:max-w-lg lg:max-w-md xl:max-w-lg max-h-[85svh] flex flex-col">
+      <ModalContent
+        className="w-full max-w-sm sm:max-w-md md:max-w-lg lg:max-w-md xl:max-w-lg max-h-[85svh] flex flex-col"
+      >
         {/* Header مدمج */}
         <div className="shrink-0 border-b border-border px-4 py-3 sm:px-6 sm:py-4">
           <ModalTitle className="text-base font-bold sm:text-lg">

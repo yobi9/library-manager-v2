@@ -48,27 +48,24 @@ export class VisitorRepository extends BaseRepository {
     const now = new Date().toISOString();
     const visitorDeviceId = deviceId || sessionId;
 
-    const existing = (await this.query("SELECT id FROM visitors WHERE device_id = ?", [
-      visitorDeviceId,
-    ])) as { id: number }[];
-    let visitorId: number;
-
-    if (existing.length) {
-      visitorId = existing[0]!.id;
-      await db.run(
-        `UPDATE visitors
-         SET last_seen = ?, ip_address = ?, user_agent = ?, device_type = ?, is_online = 1
-         WHERE id = ?`,
-        [now, ip, userAgent, deviceType, visitorId],
-      );
-    } else {
-      const result = await db.run(
-        `INSERT INTO visitors (device_id, device_type, user_agent, ip_address, is_online, first_seen, last_seen, created_at)
-         VALUES (?, ?, ?, ?, 1, ?, ?, ?)`,
-        [visitorDeviceId, deviceType, userAgent, ip, now, now, now],
-      );
-      visitorId = result.lastID as number;
-    }
+    // إدراج/تحديث ذري عبر `ON CONFLICT ... DO UPDATE ... RETURNING id`:
+    // كان الإنشاء سابقاً SELECT ثم INSERT منفصلين (check-then-act) فيتنافس
+    // طلبان متزامنان لنفس الجلسة على إنشاء نفس device_id فيفشل أحدهما بـ
+    // `UNIQUE constraint failed: visitors.device_id`. الآن العملية واحدة غير
+    // قابلة للسباق، و`RETURNING id` يغطي مساري الإنشاء والتحديث معاً.
+    const row = (await db.get(
+      `INSERT INTO visitors (device_id, device_type, user_agent, ip_address, is_online, first_seen, last_seen, created_at)
+       VALUES (?, ?, ?, ?, 1, ?, ?, ?)
+       ON CONFLICT(device_id) DO UPDATE SET
+         last_seen = excluded.last_seen,
+         ip_address = excluded.ip_address,
+         user_agent = excluded.user_agent,
+         device_type = excluded.device_type,
+         is_online = 1
+       RETURNING id`,
+      [visitorDeviceId, deviceType, userAgent, ip, now, now, now],
+    )) as { id: number } | undefined;
+    const visitorId = row!.id;
 
     await db.run(
       `INSERT INTO visitor_events (visitor_id, event_type, session_id, user_agent, ip_address, created_at)
@@ -172,21 +169,24 @@ export class VisitorRepository extends BaseRepository {
     userAgent?: string | null,
   ) {
     const db = await getDatabase();
-    const existing = (await this.query("SELECT id FROM visitors WHERE device_id = ?", [
-      userId,
-    ])) as { id: number }[];
-    let visitorId: number;
+    // نفس نمط الإدراج الذري: `ON CONFLICT(device_id) DO NOTHING` لا يرمي
+    // `UNIQUE constraint` عند التزامن، ونقرأ المعرّف من `RETURNING` أو نعيد
+    // الاستعلام عند التصادم (صف موجود مسبقاً).
+    const now = new Date().toISOString();
+    const inserted = (await db.get(
+      `INSERT INTO visitors (device_id, is_online, first_seen, last_seen, created_at)
+       VALUES (?, 0, ?, ?, ?)
+       ON CONFLICT(device_id) DO NOTHING
+       RETURNING id`,
+      [userId, now, now, now],
+    )) as { id: number } | undefined;
 
-    if (existing.length) {
-      visitorId = existing[0]!.id;
-    } else {
-      const now = new Date().toISOString();
-      const result = await db.run(
-        `INSERT INTO visitors (device_id, is_online, first_seen, last_seen, created_at)
-         VALUES (?, 0, ?, ?, ?)`,
-        [userId, now, now, now],
-      );
-      visitorId = result.lastID as number;
+    let visitorId = inserted?.id;
+    if (!visitorId) {
+      const existing = (await this.queryOne("SELECT id FROM visitors WHERE device_id = ?", [
+        userId,
+      ])) as { id: number } | undefined;
+      visitorId = existing!.id;
     }
 
     return db.run(

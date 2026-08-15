@@ -58,7 +58,7 @@ export function ScanProgressCard({
   if (isStopped) {
     return (
       <div className="flex flex-col items-center gap-3 py-6">
-        <div className="bg-success/10 text-success flex h-12 w-12 items-center justify-center rounded-full">
+        <div className="bg-success-bg text-success-text flex h-12 w-12 items-center justify-center rounded-full">
           <HardDrive size={24} />
         </div>
         <p className="text-foreground text-sm font-bold">{progress.libraryName}</p>
@@ -77,14 +77,14 @@ export function ScanProgressCard({
             isPaused ? "border-warning border-t-transparent" : "border-primary border-t-transparent"
           } ${isScanning ? "animate-spin" : ""}`}
         >
-          <HardDrive size={22} className={isPaused ? "text-warning" : "text-primary"} />
+          <HardDrive size={22} className={isPaused ? "text-warning-text" : "text-primary"} />
         </div>
       </div>
 
       <div className="text-center">
         <p className="text-foreground text-sm font-bold">
           اضافة : {progress.currentRootFolder || "..."}
-          {isPaused && <span className="text-warning me-1 text-xs"> (متوقف مؤقتاً)</span>}
+          {isPaused && <span className="text-warning-text me-1 text-xs"> (متوقف مؤقتاً)</span>}
         </p>
         <p className="text-muted-foreground text-xs">
           القسم : {progress.libraryName || "جاري معالجة البيانات"}

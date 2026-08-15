@@ -2,6 +2,8 @@ import { createVerify } from "node:crypto";
 import { readFile, writeFile, unlink, mkdir, access } from "node:fs/promises";
 import path from "node:path";
 import { ActivityRepository } from "../repositories/activity-repository";
+import { logger } from "../observability/logger";
+import { ensureDirs } from "../utils/path-utils";
 
 /**
  * Parsed `.lic` license payload. The `signature` field is a base64 RSA-SHA256
@@ -123,7 +125,29 @@ export class LicenseService {
   private licenseData: LicenseData | null = null;
   private valid = false;
 
-  constructor(private activityRepo?: ActivityRepository) {}
+  constructor(private activityRepo?: ActivityRepository) {
+    // إنشاء مجلد التراخيص `data/licenses` عند بدء التشغيل (أول بناء للخدمة)
+    // ليكون جاهزاً قبل أي `activate`/`activateFile` — الفشل يُسجَّل فقط.
+    void this.ensureDirectories();
+  }
+
+  /**
+   * يضمن وجود مجلد حفظ ملف الترخيص `data/licenses` (ثابت نسبي لجذر المشروع،
+   * بلا إعداد مؤثر عليه).
+   *
+   * - السلوك: لا يرمي الخطأ أبداً — الفشل يُسجَّل عبر `logger` فقط.
+   *
+   * @returns وعد ينجز عند ضمان وجود المجلد (أو تسجيل الفشل).
+   */
+  async ensureDirectories(): Promise<void> {
+    try {
+      await ensureDirs([LICENSE_DIR], "LicenseService");
+    } catch (err) {
+      logger.error("license.dirs_ensure_failed", {
+        message: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
 
   /**
    * Loads a license payload from a JSON string, verifies it, and keeps the

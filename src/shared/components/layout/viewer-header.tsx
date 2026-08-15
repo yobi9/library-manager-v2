@@ -36,7 +36,9 @@ export function ViewerHeader() {
   const [searchOpen, setSearchOpen] = useState(false);
   const submitRequest = useSubmitVisitorRequest();
 
-  const { theme, setTheme } = useTheme();
+  // `resolvedTheme` يعيد القيمة الفعلية (dark/light) حتى عند enableSystem،
+  // بخلاف `theme` التي قد تكون "system" في الزيارات الأولى.
+  const { resolvedTheme, setTheme } = useTheme();
 
   // إغلاق القائمة المنسدلة بزر Escape (إمكانية الوصول + الاستخدام اليومي).
   useEffect(() => {
@@ -93,17 +95,17 @@ export function ViewerHeader() {
               variant="ghost"
               size="icon"
               className="text-foreground hover:text-foreground hover:bg-white/10"
-              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+              onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
               aria-label={
                 mounted
-                  ? theme === "dark"
+                  ? resolvedTheme === "dark"
                     ? "تفعيل الوضع الفاتح"
                     : "تفعيل الوضع الداكن"
                   : "تبديل الثيم"
               }
             >
               {mounted ? (
-                theme === "dark" ? (
+                resolvedTheme === "dark" ? (
                   <Sun className="h-4 w-4" />
                 ) : (
                   <Moon className="h-4 w-4" />
@@ -137,17 +139,17 @@ export function ViewerHeader() {
               variant="ghost"
               size="icon"
               className="text-foreground hover:text-foreground hover:bg-white/10"
-              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+              onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
               aria-label={
                 mounted
-                  ? theme === "dark"
+                  ? resolvedTheme === "dark"
                     ? "تفعيل الوضع الفاتح"
                     : "تفعيل الوضع الداكن"
                   : "تبديل الثيم"
               }
             >
               {mounted ? (
-                theme === "dark" ? (
+                resolvedTheme === "dark" ? (
                   <Sun className="h-4 w-4" />
                 ) : (
                   <Moon className="h-4 w-4" />
@@ -199,10 +201,10 @@ export function ViewerHeader() {
               <Button
                 variant="ghost"
                 className="text-foreground hover:text-foreground w-full justify-start hover:bg-white/10"
-                onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+                onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
               >
                 {mounted ? (
-                  theme === "dark" ? (
+                  resolvedTheme === "dark" ? (
                     <Sun className="h-4 w-4" />
                   ) : (
                     <Moon className="h-4 w-4" />
@@ -210,7 +212,7 @@ export function ViewerHeader() {
                 ) : (
                   <div className="h-4 w-4" />
                 )}
-                <span>{mounted ? (theme === "dark" ? "الوضع الفاتح" : "الوضع الداكن") : ""}</span>
+                <span>{mounted ? (resolvedTheme === "dark" ? "الوضع الفاتح" : "الوضع الداكن") : ""}</span>
               </Button>
               <Button
                 variant="outline"

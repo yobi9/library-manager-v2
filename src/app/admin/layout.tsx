@@ -9,6 +9,8 @@ import {
   useContext,
   useState,
   useEffect,
+  useLayoutEffect,
+  useRef,
   useSyncExternalStore,
 } from "react";
 
@@ -67,6 +69,33 @@ const ADMIN_THEME_KEY = "admin_dashboard_theme";
 const ADMIN_THEME_DEFAULT = "dark";
 const adminThemeListeners = new Set<() => void>();
 
+/**
+ * [Domain] سكربت مدمج مبكر يمنع وميض الثيم الداكن في الوضع الفاتح.
+ *
+ * - الغرض: الخادم يعرض ثيم الإدارة الافتراضي الداكن دائماً (لا يقرأ
+ *   `localStorage` — متطلب عزل تفضيل الثيم عن الخادم)، فيُصدَّر أول
+ *   طلاء داكن قبل أن يقرأ المتصفح القيمة الحقيقية بعد الترطيب. هذا
+ *   السكربت المدمج المتزامن يُنفَّذ أثناء تحليل الـ HTML وقبل أول
+ *   طلاء (Pre-Paint) فيطبّق `admin-layout` و`data-theme` على `<body>`
+ *   من `localStorage` مباشرة — بنفس أسلوب anti-flash الخاص بـ next-themes.
+ * - السبب: السكربت المدمج (Inline) يعمل كحاجز متزامن يمنع المتصفح من
+ *   الرسم حتى يُنفَّذ، فلا يظهر الوميض أصلاً لا بعد ترطيب React.
+ * - النطاق: جلسة لوحة الإدارة فقط؛ لا يقرأ أو يكتب أي مفتاح آخر.
+ * - ملاحظة: نصّه يُبنى من ثابتَي `ADMIN_THEME_KEY` و`ADMIN_THEME_DEFAULT`
+ *   للحفاظ على مصدر الحقيقة الواحد (SSOT).
+ */
+export const ADMIN_THEME_SCRIPT = `(function () {
+  try {
+    var stored = localStorage.getItem(${JSON.stringify(ADMIN_THEME_KEY)});
+    var theme = stored === "light" || stored === "dark" ? stored : ${JSON.stringify(ADMIN_THEME_DEFAULT)};
+    var body = document.body;
+    if (body) {
+      body.classList.add("admin-layout");
+      body.setAttribute("data-theme", theme);
+    }
+  } catch (e) {}
+})();`;
+
 function subscribeAdminTheme(listener: () => void): () => void {
   adminThemeListeners.add(listener);
   return () => {
@@ -86,6 +115,17 @@ function notifyAdminThemeChange(): void {
   for (const listener of adminThemeListeners) listener();
 }
 
+/**
+ * [Component] تخطيط لوحة الإدارة (Layout).
+ *
+ * - الغرض: تجميع ثيم الإدارة المعزول، السايد بار، الهيدر، وحالة الموبايل
+ *   في سياق واحد لكل صفحات `/admin`.
+ * - السلوك: يقرأ/يكتب ثيم الإدارة في `localStorage` حصرياً (معزول عن الثيم
+ *   العام)، ويمنع وميض الثيم عبر سكربت مبكر يطبّق الثيم على `<body>` قبل
+ *   أول طلاء، ثم يزامنه على التنقل العميل وعند تبديل الثيم عبر
+ *   `useLayoutEffect` (يعمل قبل الرسم).
+ * - النطاق: `src/app/admin/**` فقط.
+ */
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   // ─── Theme State ───────────────────────────────────────────────
   const theme = useSyncExternalStore(
@@ -93,6 +133,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     getAdminThemeSnapshot,
     getAdminThemeServerSnapshot,
   );
+ 
 
   const updateTheme = useCallback((newTheme: string) => {
     localStorage.setItem(ADMIN_THEME_KEY, newTheme);
@@ -101,6 +142,40 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   // ─── Sidebar Mobile State ─────────────────────────────────────
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+
+  // مزامنة ثيم الإدارة على `<body>` حتى ترث كل العناصر المُعرضة عبر
+  // بوابات (Portal) — النوافذ المنبثقة، قوائم الاختيار، ومختار الملفات —
+  // نفس توكينات الثيم الإداري بدل توكينات ثيم الزوار العام (الذي قد يختلف).
+  // - التحميل الكامل (Full Load): سكربت `ADMIN_THEME_SCRIPT` سبق أن طبّق
+  //   `admin-layout` و`data-theme` على `<body>` قبل أول طلاء، وتأثير
+  //   الترطيب الأول يمرّر `theme` = لقطة الخادم (`dark`) افتراضياً؛ لذا
+  //   يتخطى هذا التأثير أول تشغيل إذا وُجد `admin-layout` على `<body>`
+  //   حتى لا يلغي قيمة السكربت ثم يعيد الرسم داكن (مصدر الوميض).
+  // - التنقل العميل (SPA) وتبديل الثيم: `useLayoutEffect` يعيد التطبيق قبل
+  //   الرسم فيبقى `<body>` متزامناً دون أي وميض بين إطارين.
+  const themeMountedRef = useRef(false);
+  useLayoutEffect(() => {
+    if (!themeMountedRef.current && document.body.classList.contains("admin-layout")) {
+      themeMountedRef.current = true;
+      return;
+    }
+    themeMountedRef.current = true;
+    const body = document.body;
+    body.classList.add("admin-layout");
+    body.dataset.theme = theme;
+  }, [theme]);
+
+  // تنظيف مستقل (أثناء ترحيل الحالة فقط): إزالة سمات الإدارة من `<body>`
+  // عند مغادرة `/admin` بالتنقل العميل حتى لا تتسرب توكينات الإدارة إلى
+  // صفحات الزوار. فصل التنظيف عن التأثير أعلاه يضمن عدم حذفها مؤقتاً عند
+  // تبديل الثيم (الذي كان يتسبب في وميض إضافي).
+  useEffect(() => {
+    return () => {
+      const body = document.body;
+      body.classList.remove("admin-layout");
+      delete body.dataset.theme;
+    };
+  }, []);
 
   const openMobile = useCallback(() => setIsMobileOpen(true), []);
   const closeMobile = useCallback(() => setIsMobileOpen(false), []);
@@ -140,11 +215,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   return (
     <AdminThemeContext.Provider value={{ theme, setTheme: updateTheme }}>
       <SidebarContext.Provider value={{ isMobileOpen, openMobile, closeMobile }}>
-        {/* ربط data-theme بالثيم الحالي */}
-        <div
-          className="admin-layout bg-background text-foreground flex min-h-screen         "
-          data-theme={theme}
-        >
+        {/* الغلاف لا يحمل data-theme الآن — الثيم يُدار على `<body>` بواسطة
+            سكربت ما قبل الطلاء والتأثير أعلاه، وCSS يستهدفهما مباشرة. */}
+        <div className="admin-layout bg-background text-foreground flex min-h-screen">
           {/* Overlay للسايد بار على الموبايل */}
           {isMobileOpen && (
             <div

@@ -5,12 +5,6 @@ import { Button } from "@/shared/components/ui/button";
 import { useState } from "react";
 import { useAdminTheme, useAdminSidebar } from "@/app/admin/layout";
 import { useRouter } from "next/navigation";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/shared/components/ui/dropdown-menu";
 import { ConfirmDialog } from "@/shared/components/ui/confirm-dialog";
 import { useAuth } from "@/lib/frontend/auth-context";
 
@@ -50,26 +44,15 @@ export function AdminHeader() {
       <div className="hidden lg:block" />
 
       <div className="flex items-center gap-3">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="outline"
-              size="icon"
-              className="border-border text-muted-foreground hover:text-foreground"
-              aria-label="تبديل ثيم الإدارة"
-            >
-              {theme === "dark" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="bg-card border-border shadow-md">
-            <DropdownMenuItem onClick={() => setTheme("dark")} className="cursor-pointer">
-              <Moon className="ml-2 h-4 w-4" /> داكن (إداري)
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setTheme("light")} className="cursor-pointer">
-              <Sun className="ml-2 h-4 w-4" /> فاتح (إداري)
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <Button
+          variant="outline"
+          size="icon"
+          className="border-border text-muted-foreground hover:text-foreground"
+          onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+          aria-label={theme === "dark" ? "تفعيل وضع الإدارة الفاتح" : "تفعيل وضع الإدارة الداكن"}
+        >
+          {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+        </Button>
 
         <div className="flex items-center gap-2">
           <div className="bg-primary text-primary-foreground flex h-8 w-8 items-center justify-center rounded-full">

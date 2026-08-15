@@ -51,8 +51,8 @@ export function DailyViewsChart({ data }: { data: number[] }) {
     scales: {
       x: { display: false },
       y: {
-        grid: { color: "rgba(255, 255, 255, 0.05)" },
-        ticks: { color: "#9ea2ae", font: { size: 10 } },
+        grid: { color: "rgba(148, 163, 184, 0.25)" },
+        ticks: { color: "#64748b", font: { size: 10 } },
       },
     },
   };

@@ -91,7 +91,7 @@ function renderLibraryRow(lib: WatchedLibraryRow, views: number) {
   return (
     <div
       key={lib.id}
-      className="hover:bg-bg-hover flex items-center justify-between gap-3 border-b border-white/5 px-3 py-2 transition-colors last:border-0"
+      className="hover:bg-bg-hover flex items-center justify-between gap-3 border-b border-border px-3 py-2 transition-colors last:border-0"
     >
       <div className="flex min-w-0 items-center gap-2.5">
         <ThumbImage src={`/api/images/${lib.id}?type=library`} alt={lib.title} />
@@ -114,7 +114,7 @@ function renderItemRow(item: WatchedItemRow, views: number) {
   return (
     <div
       key={item.id}
-      className="hover:bg-bg-hover flex items-center justify-between gap-3 border-b border-white/5 px-3 py-2 transition-colors last:border-0"
+      className="hover:bg-bg-hover flex items-center justify-between gap-3 border-b border-border px-3 py-2 transition-colors last:border-0"
     >
       <div className="flex min-w-0 items-center gap-2.5">
         <ThumbImage src={`/api/images/${item.id}?type=poster&w=40&h=60`} alt={item.title} />
@@ -138,7 +138,7 @@ function renderOldUnwatchedRow(item: OldUnwatchedItem) {
   return (
     <div
       key={item.id}
-      className="hover:bg-bg-hover flex items-center justify-between gap-3 border-b border-white/5 px-3 py-2 transition-colors last:border-0"
+      className="hover:bg-bg-hover flex items-center justify-between gap-3 border-b border-border px-3 py-2 transition-colors last:border-0"
     >
       <div className="flex min-w-0 items-center gap-2.5">
         <ThumbImage src={`/api/images/${item.id}?type=poster&w=40&h=60`} alt={item.title} />
@@ -330,7 +330,7 @@ export function DashboardPage(): React.ReactNode {
               {Array.from({ length: 4 }).map((__, j) => (
                 <div
                   key={j}
-                  className="flex items-center justify-between border-b border-white/5 px-3 py-2 last:border-0"
+                  className="flex items-center justify-between border-b border-border px-3 py-2 last:border-0"
                 >
                   <Skeleton className="h-3 w-3/5" />
                   <Skeleton className="h-3 w-10" />

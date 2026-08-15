@@ -7,6 +7,7 @@ import path from "path";
 import { getEventBus } from "./event-bus";
 import { CacheService } from "./cache-service";
 import { CachePrefixes } from "./cache-prefixes";
+import { traceGenresHealth } from "../observability/genres-trace";
 import {
   CREW_ROLE_PRIORITY,
   ESSENTIAL_CREW_ROLES,
@@ -180,16 +181,17 @@ export class MediaService {
           }
         }
         processed["folder_path"] = folderPath;
-        console.log("[OpenFolder] MediaService.getMediaById:", {
-          mediaId: id,
-          type: processed["type"] ?? null,
-          title: processed["title"] ?? null,
-          directoryPath: ownDir ?? null,
-          firstFile: firstFile?.file_path ?? null,
-          folderSource,
-          folderPath,
-        });
-
+        if (process.env.NODE_ENV === "development") {
+          console.log("[OpenFolder] MediaService.getMediaById:", {
+            mediaId: id,
+            type: processed["type"] ?? null,
+            title: processed["title"] ?? null,
+            directoryPath: ownDir ?? null,
+            firstFile: firstFile?.file_path ?? null,
+            folderSource,
+            folderPath,
+          });
+        }
         return processed;
       },
       MEDIA_DETAIL_CACHE_TTL_SECONDS,
@@ -209,11 +211,13 @@ export class MediaService {
         libMap[lib["library_id"] as number] = lib["name"] as string;
       }
     }
-    return items.map((item) => {
+    const mapped = items.map((item) => {
       const p = processMediaItem(item);
       p["library_name"] = libMap[p["library_id"] as number] ?? "Unknown";
       return p;
     });
+    traceGenresHealth("service:getMediaBatch", mapped);
+    return mapped;
   }
 
   async getLibraryMedia(
@@ -243,6 +247,9 @@ export class MediaService {
 
         const { items, total } = await this.mediaRepo.getLibraryMediaFiltered(libraryId, options);
 
+        const mappedItems = items.map(processMediaItem);
+        traceGenresHealth("service:getLibraryMedia", mappedItems);
+
         return {
           success: true,
           library: {
@@ -250,7 +257,7 @@ export class MediaService {
             name: library["name"],
             type: library["type"],
           },
-          items: items.map(processMediaItem),
+          items: mappedItems,
           pagination: {
             total,
             offset,
@@ -272,7 +279,9 @@ export class MediaService {
           string,
           unknown
         >[];
-        return items.map(processMediaItem);
+        const mapped = items.map(processMediaItem);
+        traceGenresHealth("service:getLatestItems", mapped);
+        return mapped;
       },
       MEDIA_LIST_CACHE_TTL_SECONDS,
     );
@@ -284,7 +293,9 @@ export class MediaService {
       { type: "pinned" },
       async () => {
         const items = (await this.mediaRepo.getPinnedItems()) as Record<string, unknown>[];
-        return items.map(processMediaItem);
+        const mapped = items.map(processMediaItem);
+        traceGenresHealth("service:getPinnedItems", mapped);
+        return mapped;
       },
       MEDIA_LIST_CACHE_TTL_SECONDS,
     );
@@ -353,7 +364,9 @@ export class MediaService {
           type,
           limit,
         )) as Record<string, unknown>[];
-        return items.map(processMediaItem);
+        const mapped = items.map(processMediaItem);
+        traceGenresHealth("service:getRecommendations", mapped);
+        return mapped;
       },
       MEDIA_LIST_CACHE_TTL_SECONDS,
     );
@@ -436,9 +449,27 @@ export class MediaService {
       { type: "filter", params },
       async () => {
         const result = await this.mediaRepo.getMediaByFilter(params);
+
+        // معالجة العناصر لدمج enriched في poster_path/backdrop_path إذا كانت فارغة
+        const processedItems = (result.items as Record<string, unknown>[]).map((item) => {
+          // نسخ enriched_poster إلى poster_path إذا كان poster_path فارغاً
+          if (item.enriched_poster && !item.poster_path) {
+            item.poster_path = item.enriched_poster;
+          }
+          // نسخ enriched_backdrop إلى backdrop_path إذا كان backdrop_path فارغاً
+          if (item.enriched_backdrop && !item.backdrop_path) {
+            item.backdrop_path = item.enriched_backdrop;
+          }
+          // تطبيق processMediaItem (الذي يحول id و display_title)
+          return processMediaItem(item);
+        });
+
+        const mappedItems = (result.items as Record<string, unknown>[]).map(processMediaItem);
+        traceGenresHealth("service:getMediaByFilter", mappedItems);
+
         return {
           ...result,
-          items: (result.items as Record<string, unknown>[]).map(processMediaItem),
+          items: mappedItems,
         };
       },
       MEDIA_LIST_CACHE_TTL_SECONDS,
@@ -616,7 +647,9 @@ export class MediaService {
       { kind: "person-works", personId },
       async () => {
         const works = (await this.mediaRepo.getPersonWorks(personId)) as Record<string, unknown>[];
-        return works.map(processMediaItem);
+        const mapped = works.map(processMediaItem);
+        traceGenresHealth("service:getPersonWorks", mapped);
+        return mapped;
       },
       TAXONOMY_CACHE_TTL_SECONDS,
     );

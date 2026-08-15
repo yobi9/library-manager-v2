@@ -86,7 +86,7 @@ export function BackgroundJobBanner({ session, label }: BackgroundJobBannerProps
       {isError ? (
         <XCircle className="h-4 w-4 shrink-0" />
       ) : (
-        <CheckCircle2 className="h-4 w-4 shrink-0 text-green-600" />
+          <CheckCircle2 className="h-4 w-4 shrink-0 text-success-text" />
       )}
       <span className="font-bold">{label}:</span>
       <span>

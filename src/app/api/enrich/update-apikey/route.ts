@@ -1,12 +1,19 @@
 import { NextRequest } from "next/server";
 import { getControllers } from "@/backend/controllers";
-import { requireAdmin, toNextResponse, handleRouteError, parseBody } from "@/backend/api/route-helpers";
+import {
+  requireAdmin,
+  buildContext,
+  toNextResponse,
+  handleRouteError,
+  parseBody,
+} from "@/backend/api/route-helpers";
 
 export async function POST(request: NextRequest) {
   try {
-    requireAdmin(request);
+    const auth = requireAdmin(request);
     const body = await parseBody(request);
-    return toNextResponse(await getControllers().enrichment.updateApiKey(body));
+    const ctx = buildContext(request, auth);
+    return toNextResponse(await getControllers().enrichment.updateApiKey(body, ctx.userId, ctx.ip));
   } catch (error) {
     return handleRouteError(error);
   }

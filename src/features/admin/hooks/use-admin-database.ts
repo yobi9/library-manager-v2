@@ -41,6 +41,10 @@ async function optimizeDatabase(): Promise<void> {
 
 /**
  * Create a database backup.
+ *
+ * يُنشئ النسخة في مجلد `data/backups` على الخادم باسم يحمل الطابع الزمني
+ * ويُبقيها هناك — الملف يظهر بعدها في قائمة النسخ المحلية بزر تنزيل، ولا
+ * يُنشأ أي ملف جديد عند النقر على زر التنزيل (الزر يقرأ الملف الموجود فقط).
  */
 async function backupDatabase(): Promise<void> {
   const res = await apiPost("/api/database/backup");
@@ -109,26 +113,33 @@ export function useOptimizeDatabase() {
 }
 
 /**
- * Mutation hook to create a database backup. Invalidates the database cache on success.
+ * Mutation hook to create a database backup. Invalidates the backups list so
+ * the newly created file appears immediately — الإنشاء يُحفظ في `data/backups`
+ * ولا يُنزَّل هنا؛ زر التنزيل يقرأ الملف الموجود عبر نهاية التنزيل.
  */
 export function useBackupDatabase() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: backupDatabase,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: adminDatabaseKeys.all });
+      queryClient.invalidateQueries({ queryKey: adminDatabaseKeys.backups });
     },
   });
 }
 
 /**
  * React Query hook to fetch the local backups list.
+ *
+ * يُحدَّث تلقائياً كل 30 ثانية (حتى مع تبويب خلفي) كي تظهر نسخة الجدولة
+ * التلقائية في القائمة دون إعادة تحميل الصفحة يدوياً.
  */
 export function useBackupsList() {
   return useQuery({
     queryKey: adminDatabaseKeys.backups,
     queryFn: fetchBackups,
     staleTime: 30_000,
+    refetchInterval: 30_000,
+    refetchIntervalInBackground: true,
   });
 }
 

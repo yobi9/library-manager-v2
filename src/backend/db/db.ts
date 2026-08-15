@@ -47,14 +47,23 @@ interface DbRuntimeState {
   writerContext: AsyncLocalStorage<Database>;
   /** أزميل سياق مراقبة قاعدة البيانات. */
   dbContextStore: AsyncLocalStorage<DbOperationContext | null>;
+  /**
+   * سجل العبارات قيد التنفيذ على كل اتصال (المفتاح: `main`|`writer`).
+   * أداة تشخيص لتحديد الحامل المرجّح لقفل الكتابة لحظة رصد `SQLITE_BUSY`.
+   */
+  inflightStatements: Map<string, InflightStatement>;
+  /**
+   * سجل المعاملة المفتوحة على كل اتصال (SAVEPOINT/BEGIN).
+   * المعاملة المفتوحة على اتصال تعني أنه يمسك قفل الكتابة WAL حتى إغلاقها.
+   */
+  openTransactions: Map<string, OpenTransaction>;
 }
 
 /** مفتاح تخزين حالة قاعدة البيانات على `globalThis`. */
 const RUNTIME_STATE_KEY = "__libraryManagerDbRuntimeState";
 
 const globalRuntimeState = (globalThis as Record<string, unknown>)[RUNTIME_STATE_KEY] as
-  | DbRuntimeState
-  | undefined;
+  DbRuntimeState | undefined;
 
 /** حالة التشغيل المشتركة (وحيدة عبر إعادة تقييم الوحدة). */
 const runtimeState: DbRuntimeState =
@@ -68,6 +77,8 @@ const runtimeState: DbRuntimeState =
     scannerDbStatementCount: 0,
     writerContext: new AsyncLocalStorage<Database>(),
     dbContextStore: new AsyncLocalStorage<DbOperationContext | null>(),
+    inflightStatements: new Map<string, InflightStatement>(),
+    openTransactions: new Map<string, OpenTransaction>(),
   });
 
 /** أزميل سياق اتصال الكاتب الحالي (يُقرأ من الحالة المشتركة). */
@@ -75,6 +86,181 @@ const writerContext = runtimeState.writerContext;
 
 /** أزميل سياق مراقبة قاعدة البيانات الحالي. */
 const dbContextStore = runtimeState.dbContextStore;
+
+/**
+ * بيان SQL واحد قيد التنفيذ على أحد الاتصالين؛ يُستخدم في أدلة `db.busy_detected`
+ * لتحديد العبارة التي ربما تمسك قفل الكتابة لحظة تصادم عبارة أخرى معها.
+ */
+interface InflightStatement {
+  /** الاتصال الذي تعمل عليه العبارة. */
+  connection: "main" | "writer";
+  /** نص SQL (بدون المعاملات — لا تُسجَّل القيم أبداً). */
+  sql: string;
+  /** وقت بدء العبارة (`performance.now`). */
+  startedAt: number;
+  /** معرف العملية المرتبط إن وُجد. */
+  operationId: string | null;
+  /** تسمية سياق مراقبة قاعدة البيانات إن وُجدت. */
+  context: string | null;
+}
+
+/**
+ * معاملة مفتوحة (SAVEPOINT/BEGIN) على أحد الاتصالين؛ وجودها يعني أن الاتصال
+ * يمسك قفل الكتابة WAL من أول كتابة داخل المعاملة حتى إغلاقها — وهو الحامل
+ * المرجّح للقفل عند رصد `SQLITE_BUSY` من الاتصال الآخر.
+ */
+interface OpenTransaction {
+  /** الاتصال الذي تحمل عليه المعاملة. */
+  connection: "main" | "writer";
+  /** الكلمة المفتاحية الافتتاحية (`SAVEPOINT`|`BEGIN`). */
+  keyword: string;
+  /** نص العبارة الافتتاحية (بدون المعاملات). */
+  sql: string;
+  /** وقت فتح المعاملة (`performance.now`). */
+  openedAt: number;
+  /** معرف العملية المرتبط إن وُجد. */
+  operationId: string | null;
+  /** تسمية سياق مراقبة قاعدة البيانات إن وُجدت. */
+  context: string | null;
+  /** عمق تعشيش SAVEPOINT داخل بعضها (لا يُغلق إلا عند بلوغ الصفر). */
+  depth: number;
+}
+
+/**
+ * يستخرج الكلمة المفتاحية الأولى من SQL وتصنيفها كعبارة معاملة.
+ *
+ * `ROLLBACK TO SAVEPOINT` يُعيد إلى نقطة داخلية ولا يُغلق المعاملة، لذا يُصنَّف
+ * `null` (لا فتح ولا إغلاق).
+ *
+ * @param sql - نص العبارة.
+ * @returns `open`/`close` لعبارات فتح/إغلاق المعاملة، أو `null` لغيرها.
+ */
+function classifyTxnSql(sql: string): "open" | "close" | null {
+  const keyword = sql.trim().split(/\s+/, 1)[0]?.toUpperCase() ?? "";
+  if (keyword === "SAVEPOINT" || keyword === "BEGIN") return "open";
+  if (keyword === "COMMIT") return "close";
+  if (keyword === "RELEASE") return "close";
+  if (keyword === "ROLLBACK") {
+    if (/TO\s+SAVEPOINT/i.test(sql)) return null;
+    return "close";
+  }
+  return null;
+}
+
+/**
+ * يستخرج الكلمة المفتاحية الأولى من SQL للتسجيل الآمن (لا يُسجَّل نص كامل).
+ *
+ * @param sql - نص العبارة.
+ * @returns الكلمة المفتاحية بالأحرف الكبيرة أو `unknown`.
+ */
+function sqlKeyword(sql: string): string {
+  return sql.trim().split(/\s+/, 1)[0]?.toUpperCase() ?? "unknown";
+}
+
+/**
+ * يحدّث سجل المعاملات المفتوحة بعد نجاح عبارة معاملة على أحد الاتصالين.
+ *
+ * يفتح عند `SAVEPOINT`/`BEGIN` (مع عمق التعشيش) ويغلق عند `COMMIT`/`RELEASE`/
+ * `ROLLBACK` عندما يصل العمق إلى الصفر، بحيث يبقى السجل يمثّل «هل يمسك هذا
+ * الاتصال قفل الكتابة الآن» بدقة.
+ *
+ * @param connection - الاتصال الذي نُفِّذت عليه العبارة.
+ * @param sql - نص العبارة المنفَّذة.
+ * @param operationId - معرف العملية الحالي.
+ * @param context - تسمية سياق مراقبة قاعدة البيانات الحالي.
+ */
+function trackTxnAfterSuccess(
+  connection: "main" | "writer",
+  sql: string,
+  operationId: string | null,
+  context: string | null,
+): void {
+  const classification = classifyTxnSql(sql);
+  if (classification === "open") {
+    const current = runtimeState.openTransactions.get(connection);
+    if (current) {
+      current.depth++;
+      return;
+    }
+    runtimeState.openTransactions.set(connection, {
+      connection,
+      keyword: sqlKeyword(sql),
+      sql,
+      openedAt: performance.now(),
+      operationId,
+      context,
+      depth: 1,
+    });
+    return;
+  }
+  if (classification === "close") {
+    const current = runtimeState.openTransactions.get(connection);
+    if (!current) return;
+    if (current.depth > 1) {
+      current.depth--;
+      return;
+    }
+    runtimeState.openTransactions.delete(connection);
+  }
+}
+
+/**
+ * يسجّل دليل تصادم قفل (`SQLITE_BUSY`) للعبارة الحالية مع صورة لحظية عن
+ * الاتصال الآخر: العبارة قيد التنفيذ والمعاملة المفتوحة عليه (الحامل المرجّح
+ * لقفل الكتابة) — لإغلاق فجوة أدلة «مَن يمسك القفل ≥30 ثانية».
+ *
+ * تُستدعى من داخل حلقة إعادة المحاولة عند كل اكتشاف `SQLITE_BUSY` على أي من
+ * الاتصالين، ويبقى التسجيل مقصوراً على ما يسمح به الـ logger (dev فقط).
+ *
+ * @param connection - اتصال العبارة المتصادمة.
+ * @param sql - نص العبارة المتصادمة.
+ * @param attempt - رقم المحاولة الحالي.
+ * @param elapsedMs - المدة المنقضية منذ بدء العبارة حتى رصد التصادم.
+ * @param operationId - معرف العملية الحالي.
+ * @param context - تسمية سياق مراقبة قاعدة البيانات الحالي.
+ */
+function emitBusyDetected(
+  connection: "main" | "writer",
+  sql: string,
+  attempt: number,
+  elapsedMs: number,
+  operationId: string | null,
+  context: string | null,
+): void {
+  const other: "main" | "writer" = connection === "main" ? "writer" : "main";
+  const inflight = runtimeState.inflightStatements.get(other);
+  const openTxn = runtimeState.openTransactions.get(other);
+  logger.warn("db.busy_detected", {
+    operationId,
+    context: context ?? "",
+    connection,
+    keyword: sqlKeyword(sql),
+    sql: sql.slice(0, 120),
+    attempt,
+    elapsedMs: Math.round(elapsedMs),
+    otherConnection: other,
+    otherInflight:
+      inflight == null
+        ? null
+        : {
+            keyword: sqlKeyword(inflight.sql),
+            sql: inflight.sql.slice(0, 120),
+            startedAgoMs: Math.round(performance.now() - inflight.startedAt),
+            operationId: inflight.operationId,
+            context: inflight.context,
+          },
+    otherOpenTxn:
+      openTxn == null
+        ? null
+        : {
+            keyword: openTxn.keyword,
+            sql: openTxn.sql.slice(0, 120),
+            ageMs: Math.round(performance.now() - openTxn.openedAt),
+            operationId: openTxn.operationId,
+            context: openTxn.context,
+          },
+  });
+}
 
 /**
  * ينفّذ `fn` ضمن سياق مراقبة لقاعدة البيانات: كل عبارات SQL أثناءه (على
@@ -199,63 +385,96 @@ function wrapDbMethods(database: Database): Database {
         runtimeState.scannerDbStatementCount++;
       }
 
-      // المراقبة المنظمة (Developer Console): تُقاس مدة كل عبارة على اتصال
-      // الكاتب وتُحدَّث العدادات العالمية (`db-stats`) وتُسجَّل أحداث
-      // `db.busy`/`db.transaction.*`. تُغلق بالكامل عندما تكون المراقبة
-      // معطلة (`logger.enabled === false`) فلا تكلف شيئاً خارج المسح.
-      const observe = logger.enabled && isWriter;
+      const connection: "main" | "writer" = isWriter ? "writer" : "main";
+      const observe = logger.enabled;
       const slowQueryMs = SLOW_QUERY_MS;
       const started = observe || slowQueryMs > 0 ? performance.now() : 0;
       let attempts = 0;
       let busyOccurrences = 0;
       let lockWaitMs = 0;
 
-      for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-        attempts = attempt;
-        try {
-          const result = await (original as (...a: unknown[]) => Promise<unknown>)(...args);
-          const durationMs = performance.now() - started;
-          if (observe) {
-            const changes =
-              result && typeof result === "object" && "changes" in result
-                ? (result as { changes: number }).changes
-                : undefined;
-            const context = getDbOperationContext();
-            recordDbObservation(
-              {
-                method,
-                sql: typeof args[0] === "string" ? args[0] : "",
-                durationMs,
-                attempts,
-                rowsAffected: changes,
-                busyOccurrences,
-                lockWaitMs,
-                context: context?.label,
-              },
-              context?.operationId ?? currentOperationId(),
-            );
-          }
-          if (slowQueryMs > 0 && durationMs >= slowQueryMs) {
-            logger.warn("db.slow_statement", {
-              connection: isWriter ? "writer" : "main",
-              method,
-              sql: (typeof args[0] === "string" ? args[0] : "").slice(0, 300),
-              durationMs: Math.round(durationMs),
-              attempts,
-            });
-          }
-          return result;
-        } catch (err) {
-          if (isSqliteBusy(err) && attempt < MAX_RETRIES) {
-            const delay = BASE_DELAY_MS * Math.pow(2, attempt - 1);
+      const opContext = getDbOperationContext();
+      const operationId = opContext?.operationId ?? currentOperationId();
+
+      if (observe) {
+        runtimeState.inflightStatements.set(connection, {
+          connection,
+          sql: typeof args[0] === "string" ? args[0] : "",
+          startedAt: performance.now(),
+          operationId,
+          context: opContext?.label ?? null,
+        });
+      }
+
+      try {
+        for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+          attempts = attempt;
+          try {
+            const result = await (original as (...a: unknown[]) => Promise<unknown>)(...args);
+            const durationMs = performance.now() - started;
             if (observe) {
-              busyOccurrences++;
-              lockWaitMs += delay;
+              const changes =
+                result && typeof result === "object" && "changes" in result
+                  ? (result as { changes: number }).changes
+                  : undefined;
+              recordDbObservation(
+                {
+                  connection,
+                  method,
+                  sql: typeof args[0] === "string" ? args[0] : "",
+                  durationMs,
+                  attempts,
+                  rowsAffected: changes,
+                  busyOccurrences,
+                  lockWaitMs,
+                  context: opContext?.label,
+                },
+                operationId,
+              );
+              trackTxnAfterSuccess(
+                connection,
+                String(args[0] ?? ""),
+                operationId,
+                opContext?.label ?? null,
+              );
             }
-            await new Promise((r) => setTimeout(r, delay));
-            continue;
+            if (slowQueryMs > 0 && durationMs >= slowQueryMs) {
+              logger.warn("db.slow_statement", {
+                connection,
+                method,
+                sql: (typeof args[0] === "string" ? args[0] : "").slice(0, 300),
+                durationMs: Math.round(durationMs),
+                attempts,
+              });
+            }
+            return result;
+          } catch (err) {
+            const busy = isSqliteBusy(err);
+            if (busy && observe) {
+              busyOccurrences++;
+              emitBusyDetected(
+                connection,
+                typeof args[0] === "string" ? args[0] : "",
+                attempt,
+                performance.now() - started,
+                operationId,
+                opContext?.label ?? null,
+              );
+            }
+            if (busy && attempt < MAX_RETRIES) {
+              const delay = BASE_DELAY_MS * Math.pow(2, attempt - 1);
+              if (observe) {
+                lockWaitMs += delay;
+              }
+              await new Promise((r) => setTimeout(r, delay));
+              continue;
+            }
+            throw err;
           }
-          throw err;
+        }
+      } finally {
+        if (observe) {
+          runtimeState.inflightStatements.delete(connection);
         }
       }
     };

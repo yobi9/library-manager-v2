@@ -138,25 +138,14 @@ export function AdminSidebar() {
                   <img
                     src="/estra7ah.svg"
                     alt="Logo"
-                    className="h-auto w-20 object-contain brightness-110 transition-transform hover:scale-105"
+                    className="admin-logo h-auto w-20 object-contain brightness-110 transition-transform hover:scale-105"
                   />
                 </div>
               </Link>
               <a
                 href={ROUTES.ADMIN_LICENSE}
-                className="absolute"
-                style={{
-                  background: "#d5ff00",
-                  color: "#000",
-                  padding: "0 2px",
-                  borderRadius: "11px",
-                  fontSize: "10px",
-                  fontWeight: "300",
-                  textDecoration: "none",
-                  top: "25px",
-                  left: "105px",
-                  width: "fit-content",
-                }}
+                className="absolute bg-brand-accent text-brand-accent-foreground rounded-full px-0.5 text-[10px] font-light no-underline"
+                style={{ top: "25px", left: "105px", width: "fit-content" }}
               >
                 <div>بروفاشنال</div>
               </a>
@@ -167,7 +156,7 @@ export function AdminSidebar() {
                 src="/estra7ah.svg"
                 alt="Logo"
                 fill
-                className="object-contain brightness-110"
+                className="admin-logo object-contain brightness-110"
               />
             </div>
           )}
@@ -279,25 +268,14 @@ export function AdminSidebar() {
                   <img
                     src="/estra7ah.svg"
                     alt="Logo"
-                    className="h-auto w-20 object-contain brightness-110 transition-transform hover:scale-105"
+                    className="admin-logo h-auto w-20 object-contain brightness-110 transition-transform hover:scale-105"
                   />
                 </div>
               </Link>
               <a
                 href={ROUTES.ADMIN_LICENSE}
-                className="absolute"
-                style={{
-                  background: "#d5ff00",
-                  color: "#000",
-                  padding: "0 2px",
-                  borderRadius: "11px",
-                  fontSize: "10px",
-                  fontWeight: "300",
-                  textDecoration: "none",
-                  top: "25px",
-                  left: "105px",
-                  width: "fit-content",
-                }}
+                className="absolute bg-brand-accent text-brand-accent-foreground rounded-full px-0.5 text-[10px] font-light no-underline"
+                style={{ top: "25px", left: "105px", width: "fit-content" }}
               >
                 <div>بروفاشنال</div>
               </a>
@@ -308,7 +286,7 @@ export function AdminSidebar() {
                 src="/estra7ah.svg"
                 alt="Logo"
                 fill
-                className="object-contain brightness-110"
+                className="admin-logo object-contain brightness-110"
               />
             </div>
           )}

@@ -1,3 +1,4 @@
+//src\app\(viewer)\layout.tsx
 import { getServices } from "@/backend/services";
 import { redirect } from "next/navigation";
 import { cookies, headers } from "next/headers";
@@ -41,14 +42,24 @@ export default async function ViewerLayout({ children }: { children: React.React
   const visitorSessionId =
     headersList.get("x-visitor-session-id") || cookieStore.get("visitor_session_id")?.value;
   if (visitorSessionId && !isAdmin) {
-    await services.visitor.trackView({
-      sessionId: visitorSessionId,
-      ip:
-        headersList.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-        headersList.get("x-real-ip") ||
-        "127.0.0.1",
-      userAgent: headersList.get("user-agent") || "",
-    });
+    // التتبع غير حرج (Best-Effort): أي فشل في تسجيل الزيارة (تعارض مؤقت مع
+    // كاتب الماسح أو غيرها) يجب ألا يُسقط الصفحة العامة — نلتقط الخطأ ونسجّله
+    // فقط ونكمل عرض الصفحة.
+    try {
+      await services.visitor.trackView({
+        sessionId: visitorSessionId,
+        ip:
+          headersList.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+          headersList.get("x-real-ip") ||
+          "127.0.0.1",
+        userAgent: headersList.get("user-agent") || "",
+      });
+    } catch (error) {
+      console.error(
+        "[ViewerLayout] Visitor tracking failed:",
+        error instanceof Error ? error.message : String(error),
+      );
+    }
   }
 
   return (

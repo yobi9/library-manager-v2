@@ -114,7 +114,7 @@ export function ReportsPage() {
                   onClick={() => handleUpdateStatus(r, "resolved")}
                   title="قبول"
                 >
-                  <CheckCircle className="h-4 w-4 text-green-500" />
+                  <CheckCircle className="h-4 w-4 text-success-text" />
                 </Button>
                 <Button
                   variant="ghost"

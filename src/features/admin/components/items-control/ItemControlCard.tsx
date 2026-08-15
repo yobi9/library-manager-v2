@@ -149,7 +149,7 @@ export function ItemControlCard({
               aria-label={pinned ? "إزالة التثبيت" : "تثبيت"}
             >
               <Star
-                className={cn("h-3.5 w-3.5", pinned && "fill-amber-400 text-amber-400")}
+                className={cn("h-3.5 w-3.5", pinned && "fill-rating-star text-rating-star")}
               />
             </Button>
             <Button

@@ -98,7 +98,7 @@ export function SearchModal({ open, onOpenChange }: SearchModalProps) {
           {results && results.length > 0 && (
             <ul className="divide-border/60 divide-y">
               {results.map((item) => (
-                <li key={item.id}>
+                 <li key={`${item.type}-${item.id}`}>   {/* ✅ composite key */}
                   <button
                     type="button"
                     onClick={() => navigateTo(buildMediaUrl({ id: item.id, type: item.type }))}

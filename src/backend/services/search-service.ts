@@ -1,5 +1,6 @@
 import { SearchRepository } from "../repositories/search-repository";
 import { normalizeQuery } from "../utils/search-normalizer";
+import { runInWriterContext } from "../db/db";
 import { CacheService } from "./cache-service";
 import { CachePrefixes } from "./cache-prefixes";
 
@@ -31,6 +32,8 @@ export class SearchService {
   constructor(
     private searchRepo: SearchRepository,
     private cache: CacheService,
+    /** اختياري: مسند يعيد `true` عند وجود مسح نشط — يرفض إعادة بناء الفهرس حينها. */
+    private getIsScanActive?: () => boolean,
   ) {}
 
   /**
@@ -112,9 +115,25 @@ export class SearchService {
    * Delegates to the repository to clear and repopulate all indexed columns,
    * including denormalized genres and cast names. Purges the search cache so
    * subsequent queries reflect the rebuilt index.
+   *
+   * @throws Error when a scan is in progress (write-heavy operation would
+   *         compete with the scanner writer) or when the repository fails.
+   * @returns Repository result (currently `void`).
    */
   async rebuildIndex() {
-    const result = await this.searchRepo.rebuildIndex();
+    // رفض إعادة البناء أثناء مسح نشط: عملية كتسح كامل `media_items` (قراءة +
+    // حذف + إدراج) تتنافس مع كاتب الماسح على قفل كتابة WAL — الرسالة الواضحة
+    // أفضل من فشل `database is locked` الغامض عند المستخدم.
+    if (this.getIsScanActive?.() === true) {
+      throw new Error(
+        "لا يمكن إعادة بناء فهرس البحث أثناء مسح قيد التشغيل؛ انتظر اكتمال المسح ثم أعد المحاولة",
+      );
+    }
+
+    // تُنفَّذ على اتصال الكاتب (`runInWriterContext`) حتى لا تتصادم كتابة
+    // DELETE/INSERT مع القراءات النشطة على الاتصال الرئيسي — نفس نمط تنفيذ
+    // `backfillSearchIndex` من نقطة التجميع بعد كل مسح.
+    const result = await runInWriterContext(() => this.searchRepo.rebuildIndex());
     await this.cache.deleteByPrefix(CachePrefixes.search);
     return result;
   }

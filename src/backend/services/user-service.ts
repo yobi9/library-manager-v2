@@ -7,6 +7,11 @@ import { UserSessionRepository } from "../repositories/session-repository";
 import { ActivityRepository } from "../repositories/activity-repository";
 import { SecurityEventRepository } from "../repositories/security-repository";
 import { getEventBus } from "./event-bus";
+import { logger } from "../observability/logger";
+import { ensureDirs } from "../utils/path-utils";
+
+/** مجلد صور المستخدمين (الصور الرمزية) داخل `public` — مسار ثابت بلا إعداد مؤثر. */
+const AVATARS_DIR = path.join(process.cwd(), "public", "assets", "images", "avatars");
 
 export class UserService {
   constructor(
@@ -14,7 +19,29 @@ export class UserService {
     private sessionRepo: UserSessionRepository,
     private activityRepo: ActivityRepository,
     private securityRepo: SecurityEventRepository,
-  ) {}
+  ) {
+    // إنشاء مجلد الصور الرمزية `public/assets/images/avatars` عند بدء التشغيل
+    // ليكون جاهزاً قبل أول رفع صورة — الفشل يُسجَّل فقط ولا يعطّل التشغيل.
+    void this.ensureDirectories();
+  }
+
+  /**
+   * يضمن وجود مجلد الصور الرمزية للمستخدمين `public/assets/images/avatars`
+   * (مسار ثابت نسبي لجذر المشروع، بلا إعداد مؤثر عليه).
+   *
+   * - السلوك: لا يرمي الخطأ أبداً — الفشل يُسجَّل عبر `logger` فقط.
+   *
+   * @returns وعد ينجز عند ضمان وجود المجلد (أو تسجيل الفشل).
+   */
+  async ensureDirectories(): Promise<void> {
+    try {
+      await ensureDirs([AVATARS_DIR], "UserService");
+    } catch (err) {
+      logger.error("users.dirs_ensure_failed", {
+        message: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
 
   private checkAccess(
     callerUserId: number,
@@ -353,7 +380,7 @@ export class UserService {
             ? "gif"
             : "jpg";
 
-    const dir = path.join(process.cwd(), "public", "assets", "images", "avatars");
+    const dir = AVATARS_DIR;
     await mkdir(dir, { recursive: true });
     const filename = `avatar_${userId}_${Date.now()}_${crypto.randomBytes(4).toString("hex")}.${ext}`;
     await writeFile(path.join(dir, filename), bytes);

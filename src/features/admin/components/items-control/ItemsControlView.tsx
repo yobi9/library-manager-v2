@@ -97,7 +97,7 @@ export function ItemsControlView({
   const renderGrid = () => {
     if (isLoading) {
       return (
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,160px),1fr))] gap-3">
+        <div className="grid grid-cols-4 sm:grid-cols-4 lg:grid-cols-8 xl:grid-cols-10 2xl:grid-cols-12 gap-3">
           {Array.from({ length: 12 }).map((_, i) => (
             <Skeleton key={i} className="aspect-2/3 rounded-xl" />
           ))}
@@ -118,7 +118,7 @@ export function ItemsControlView({
     return (
       <div
         className={cn(
-          "grid grid-cols-[repeat(auto-fill,minmax(min(100%,160px),1fr))] gap-3 transition-opacity",
+          "grid grid-cols-4 sm:grid-cols-4 lg:grid-cols-8 xl:grid-cols-10 2xl:grid-cols-12 gap-3 transition-opacity",
           isRefetching && !isLoading && "opacity-60",
         )}
       >
@@ -207,7 +207,7 @@ export function ItemsControlView({
               title={pinned ? "إزالة التثبيت" : "تثبيت"}
               aria-label={pinned ? "إزالة التثبيت" : "تثبيت"}
             >
-              <Star className={cn("h-4 w-4", pinned && "fill-amber-400 text-amber-400")} />
+              <Star className={cn("h-4 w-4", pinned && "fill-rating-star text-rating-star")} />
             </Button>
             <Button
               variant="ghost"

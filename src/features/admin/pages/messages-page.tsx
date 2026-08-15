@@ -183,8 +183,8 @@ export function MessagesPage() {
                   className={cn(
                     "shrink-0 px-2 py-0.5 text-[10px]",
                     msg.status === "read"
-                      ? "border-green-500/30 bg-green-500/20 text-green-600"
-                      : "border-amber-500/30 bg-amber-500/20 text-amber-600",
+                      ? "border-success-border bg-success-bg text-success-text"
+                      : "border-warning-border bg-warning-bg text-warning-text",
                   )}
                 >
                   {msg.status === "read" ? "مقروء" : "غير مقروء"}
@@ -309,8 +309,8 @@ export function MessagesPage() {
                       className={cn(
                         "px-2 py-0.5 text-[10px]",
                         msg.status === "read"
-                          ? "border-green-500/30 bg-green-500/20 text-green-600 dark:bg-green-500/30 dark:text-green-400"
-                          : "border-amber-500/30 bg-amber-500/20 text-amber-600 dark:bg-amber-500/30 dark:text-amber-400",
+                          ? "border-success-border bg-success-bg text-success-text"
+                          : "border-warning-border bg-warning-bg text-warning-text",
                       )}
                     >
                       {msg.status === "read" ? "مقروء" : "غير مقروء"}

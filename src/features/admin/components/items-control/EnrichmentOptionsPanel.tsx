@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import { Settings2, ShieldCheck, Save } from "lucide-react";
+import { Settings2, ShieldCheck, Save, Eye, EyeOff } from "lucide-react";
 import { Card, CardContent } from "@/shared/components/ui/card";
 import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
@@ -17,15 +17,15 @@ import {
 
 const STORAGE_MODE_OPTIONS = [
   { value: "local", label: "المجلد العام" },
-  { value: "s3", label: "التخزين السحابي (S3)" },
-  { value: "both", label: "كليهما" },
+  { value: "media_folder", label: "جانب الميديا" },
 ];
 
 /**
  * لوحة إعدادات الإثراء لصفحة التحكم بالعناصر.
  *
- * تسمح للمشرف بحفظ مفتاح TMDB واختبار الاتصال، وضبط خيارات التنزيل
- * (الصور، صور الممثلين) وطريقة التخزين عبر إعدادات النظام العامة.
+ * تعرض مفتاح TMDB المخزّن في قاعدة البيانات كنقاط عند فتح اللوحة، مع زر
+ * إظهار/إخفاء المفتاح، وتسمح للمشرف بحفظ مفتاح جديد أو اختبار الاتصال، وضبط
+ * خيارات التنزيل (الصور، صور الممثلين) وطريقة التخزين عبر إعدادات النظام العامة.
  * جميع التغييرات تُحفظ مباشرة في الخلفية عبر الـ API المعنية.
  */
 export function EnrichmentOptionsPanel() {
@@ -35,7 +35,24 @@ export function EnrichmentOptionsPanel() {
   const testConnectionMutation = useTestEnrichmentConnection();
 
   const [apiKey, setApiKey] = useState("");
+  const [showApiKey, setShowApiKey] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  // يتحول إلى true عند أول تعديل يدوي للحقل، لمنع إعادة تعبئته من الإعدادات لاحقاً.
+  const [fieldTouched, setFieldTouched] = useState(false);
+  // القيمة السابقة للمفتاح المخزن — تُقارن مع الإعدادات أثناء العرض (نمط prev-state).
+  const [prevStoredKey, setPrevStoredKey] = useState<string | undefined>(undefined);
+
+  const storedKey = typeof settings?.tmdb_api_key === "string" ? settings.tmdb_api_key : undefined;
+
+  // تعبئة الحقل بالمفتاح المخزن في قاعدة البيانات عند أول وصول للإعدادات، وفق النمط
+  // الموثّق (تعديل الحالة أثناء العرض بمقارنة القيمة السابقة) بدل استخدام تأثير.
+  // لا تُعاد التعبئة بعد تعديل يدوي من المستخدم حتى لا يضيع ما كتبه.
+  if (storedKey !== prevStoredKey) {
+    setPrevStoredKey(storedKey);
+    if (!fieldTouched && typeof storedKey === "string" && storedKey.trim() !== "") {
+      setApiKey(storedKey);
+    }
+  }
 
   const downloadImages = Boolean(settings?.download_images);
   const downloadCastImages = Boolean(settings?.download_cast_images);
@@ -61,6 +78,10 @@ export function EnrichmentOptionsPanel() {
     );
   };
 
+  /**
+   * يحفظ مفتاح TMDB الحالي في الحقل عبر الـ API المخصص بعد التحقق من
+   * طوله (10 أحرف على الأقل). يُبقي الحقل معروضاً بقيمته بعد النجاح.
+   */
   const handleSaveApiKey = () => {
     if (apiKey.trim().length < 10) {
       toast.error("مفتاح API يجب أن يكون 10 أحرف على الأقل");
@@ -69,17 +90,19 @@ export function EnrichmentOptionsPanel() {
     updateApiKeyMutation.mutate(apiKey.trim(), {
       onSuccess: () => {
         toast.success("تم حفظ مفتاح TMDB");
-        setApiKey("");
       },
       onError: (error) => toast.error(error instanceof Error ? error.message : "فشل حفظ المفتاح"),
     });
   };
 
+  /**
+   * يختبر الاتصال بـ TMDB باستخدام المفتاح الحالي في الحقل. في حال النجاح
+   * يُبقي الحقل معروضاً بقيمته، ويُعرَض فيلم الاختبار الذي أعاده الخادم.
+   */
   const handleTestConnection = () => {
     testConnectionMutation.mutate(apiKey.trim(), {
       onSuccess: (data) => {
         toast.success(`الاتصال ناجح — فيلم الاختبار: ${data.testMovie ?? "N/A"}`);
-        setApiKey("");
       },
       onError: (error) =>
         toast.error(error instanceof Error ? error.message : "فشل الاتصال مع TMDB"),
@@ -110,14 +133,28 @@ export function EnrichmentOptionsPanel() {
                 <div className="flex gap-2">
                   <Input
                     id="tmdb-api-key"
-                    type="password"
+                    type={showApiKey ? "text" : "password"}
                     dir="rtl"
                     autoComplete="new-password"
-                    placeholder="اتركه فارغاً لاستخدام السيرفر الافتراضي"
+                    placeholder="أدخل مفتاح TMDB API"
                     value={apiKey}
-                    onChange={(e) => setApiKey(e.target.value)}
+                    onChange={(e) => {
+                      setFieldTouched(true);
+                      setApiKey(e.target.value);
+                    }}
                     className="flex-1"
                   />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    aria-label={showApiKey ? "إخفاء المفتاح" : "إظهار المفتاح"}
+                    title={showApiKey ? "إخفاء المفتاح" : "إظهار المفتاح"}
+                    onClick={() => setShowApiKey((v) => !v)}
+                    className="shrink-0"
+                  >
+                    {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </Button>
                   <Button
                     variant="outline"
                     size="sm"

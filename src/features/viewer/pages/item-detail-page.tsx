@@ -11,7 +11,7 @@ import { useSeasonEpisodes } from "@/lib/frontend/use-season-episodes";
 
 import { isSeriesType } from "@/lib/frontend/media-constants";
 import { getPosterUrl, getBackdropUrl } from "@/lib/frontend/image-helpers";
-import { mapMediaToCard, extractGenres } from "@/lib/frontend/media-helpers";
+import { mapMediaToCard, extractGenres, isItemNew } from "@/lib/frontend/media-helpers";
 import { EpisodeCard } from "@/features/viewer/components/episode-card";
 import { Breadcrumbs } from "@/shared/components/ui/breadcrumbs";
 import { UnifiedMedia } from "@/features/viewer/components/unified-media/unified-media";
@@ -150,7 +150,7 @@ function SeasonEpisodesSection({
       </div>
 
       {isLoading ? (
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,240px),1fr))] gap-3">
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,180px),1fr))] gap-3">
           {Array.from({ length: 6 }).map((_, i) => (
             <div key={i} className="bg-muted aspect-video animate-pulse rounded-xl" />
           ))}
@@ -158,7 +158,7 @@ function SeasonEpisodesSection({
       ) : episodes.length === 0 ? (
         <p className="text-muted-foreground py-8 text-center">لا توجد حلقات</p>
       ) : (
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,240px),1fr))] gap-3">
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,180px),1fr))] gap-3">
           {episodes.map(
             (
               ep: {
@@ -188,6 +188,12 @@ function SeasonEpisodesSection({
   );
 }
 
+/**
+ * صفحة تفاصيل عنصر وسائط: الملصق، البيانات والتصنيفات، القصة، طاقم التمثيل والعمل،
+ * شريط المواسم للمسلسلات، وقسم التوصيات.
+ *
+ * @returns صفحة التفاصيل كاملة.
+ */
 export default function ItemDetailPage() {
   const { id } = useParams<{ type: string; id: string }>();
   const router = useRouter();
@@ -499,12 +505,12 @@ export default function ItemDetailPage() {
 
             {/* <div className="flex gap-3 overflow-x-auto pb-2 -mx-3 sm:-mx-4 md:-mx-6 lg:-mx-8 px-3 sm:px-4 md:px-6  "> */}
             {/* الهوامش السالبة هنا تضمن أن السلايدر يملأ الشاشة كاملة */}
-            <div className="-mx-3 flex gap-3 overflow-x-auto px-3 pb-2 sm:-mx-4 sm:px-4 md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
+            <div className="-mx-3 flex gap-3  px-3 pb-2 sm:-mx-4 sm:px-4 md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
               {seasons.map((season) => {
                 const seasonId = season.media_id ?? season.id ?? 0;
                 return (
                   <div key={String(seasonId)} className="w-36 shrink-0 sm:w-40">
-                    <UnifiedCard
+                      <UnifiedCard
                       id={String(seasonId)}
                       title={season.title ?? "الموسم"}
                       imageUrl={
@@ -513,11 +519,15 @@ export default function ItemDetailPage() {
                           : undefined
                       }
                       year={season.year ?? ""}
-                      rating={season.imdb_rating ?? season.rating}
+                     
+                      isNew={isItemNew(season.created_at ?? season.createdAt)}
+                     
                       isSelected={selectedSeasonId === seasonId}
-                      iconVariant="play"
+                       iconVariant="link"
                       onClick={() => handleSeasonClick(seasonId)}
-                    />
+                    /> 
+ 
+
                   </div>
                 );
               })}
@@ -542,10 +552,12 @@ export default function ItemDetailPage() {
             />
             <UnifiedMedia
               mode="slider"
+                 
               isLoading={recsLoading}
               skeletonCount={10}
               items={recommendations.slice(0, 20)}
               mapItemToProps={mapMediaToCard}
+             
             />
           </section>
         )}

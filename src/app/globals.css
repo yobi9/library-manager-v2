@@ -8,7 +8,8 @@
 
    🔹 المبادئ الأساسية:
      1. جميع المتغيرات لها اسم موحد (مثل --background، --primary، ...)
-     2. يتم إعادة تعريفها داخل كل سياق ( :root / .dark / .admin-layout )
+     2. يتم إعادة تعريفها داخل كل سياق
+        ( :root / .dark / body.admin-layout / body.admin-layout[data-theme="light"] )
      3. لا وجود لأسماء خاصة بالإدارة (مثل admin-*) – كل شيء موحد.
      4. المتغيرات الإضافية (مثل --bg-deep, --accent-hover) هي متغيرات
         عامة يمكن استخدامها في أي مكان، لكن قيمها تختلف حسب السياق.
@@ -16,8 +17,8 @@
    🔹 السياقات المعرفة حالياً:
      - :root           → الوضع الفاتح للواجهة العامة.
      - .dark           → الوضع الداكن للواجهة العامة.
-     - .admin-layout   → الوضع الداكن للواجهة الإدارية (الافتراضي).
-     - .admin-layout[data-theme="light"] → الوضع الفاتح للإدارة.
+     - body.admin-layout → الوضع الداكن للواجهة الإدارية (الافتراضي).
+     - body.admin-layout[data-theme="light"] → الوضع الفاتح للإدارة.
 
    🔹 كيفية الاستخدام في أي مكون:
      - استخدم كلاسات Tailwind مثل: bg-background, text-foreground, border-border
@@ -42,6 +43,16 @@
 @import "tailwindcss";
 
 @plugin "tailwindcss-animate";
+
+/* تفعيل كلاسات `dark:` استناداً إلى كلاس `.dark` على `<html>` بدل
+   إعداد نظام التشغيل (مطلوب لأن next-themes تستخدم attribute="class"). */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* متغير إداري مخصص لاستهداف الوضع الداكن للوحة الإدارة فقط، مستقل عن
+   الثيم العام: يُفعَّل داخل `<body class="admin-layout">` ما لم تكن
+   `data-theme="light"`. (مثال: `admin-dark:text-green-400` لشارات الحالة
+   في صفحة الرسائل). */
+@custom-variant admin-dark (&:where(body.admin-layout:not([data-theme="light"]), body.admin-layout:not([data-theme="light"]) *));
 
 /* ================================================================
    🖋 تعريفات الخط (Estra7ah)
@@ -230,15 +241,14 @@
   --switch-off-thumb: #d1d5db;
   --dot-indicator: #ededed;
 
- --ring: #6b7280
-
-
-
-
 }
 
 /* ---------- 3. لوحة الإدارة – الوضع الداكن ---------- */
-.admin-layout {
+/* ثيم الإدارة – الداكن (يُفعَّل تلقائياً على `<body class="admin-layout">`،
+   وهو القيمة الافتراضية عند غياب data-theme). ربطه بالـ `<body>` — بدل
+   غلاف React — ضروري حتى ترث كل البوابات (Portal) والنوافذ المنبثقة
+   التوكينات، ويُطبَّق بواسطة سكربت مبكر قبل أول طلاء لمنع وميض الثيم. */
+body.admin-layout {
   --background: #0b111e;
   --foreground: #dee2ec;
   --card: #151b2d;
@@ -293,6 +303,25 @@
   --skeleton-shine: #242b3f;
   --text-on-media: #ffffff;
 
+  /* الحالة الدلالية */
+  --success-bg: rgba(16, 185, 129, 0.15);
+  --success-border: rgba(16, 185, 129, 0.4);
+  --success-text: #4ade80;
+  --warning-bg: rgba(245, 158, 11, 0.15);
+  --warning-border: rgba(245, 158, 11, 0.4);
+  --warning-text: #fbbf24;
+  --danger-bg: rgba(220, 38, 38, 0.15);
+  --danger-border: rgba(220, 38, 38, 0.4);
+  --danger-text: #fca5a5;
+  --info: #38bdf8;
+  --info-bg: rgba(56, 189, 248, 0.15);
+  --info-border: rgba(56, 189, 248, 0.4);
+
+  /* إدارية */
+  --admin-scrollbar-thumb: #242e42;
+  --brand-accent: #d5ff00;
+  --brand-accent-foreground: #000000;
+
   --switch-bg: #8bc34a;
   --switch-border: #8bc34a;
   --switch-thumb: #334f13;
@@ -305,71 +334,92 @@
 }
 
 /* ---------- 4. لوحة الإدارة – الوضع الفاتح ---------- */
-.admin-layout[data-theme="light"] {
-  --background: #ffffff;
-  --foreground: #1a1a1a;
+/* ================================================================
+   🎨 ثيم الإدارة المحسن – الفاتح (admin-light)
+   ================================================================ */
+body.admin-layout[data-theme="light"] {
+  --background: #f8fafc;          /* أبيض مزرق نقي */
+  --foreground: #1a1a2e;          /* رمادي داكن للنصوص */
   --card: #ffffff;
-  --card-foreground: #1a1a1a;
+  --card-foreground: #1a1a2e;
   --popover: #ffffff;
-  --popover-foreground: #1a1a1a;
-  --primary: #00796b;
+  --popover-foreground: #1a1a2e;
+  --primary: #00897b;
   --primary-foreground: #ffffff;
-  --secondary: rgba(0, 0, 0, 0.04);
-  --secondary-foreground: #1a1a1a;
-  --muted: rgba(0, 0, 0, 0.04);
+  --secondary: #f1f5f9;
+  --secondary-foreground: #1a1a2e;
+  --muted: #f1f5f9;
   --muted-foreground: #6b7280;
-  --accent: #00796b;
+  --accent: #0e7490;
   --accent-foreground: #ffffff;
   --destructive: #dc2626;
   --destructive-foreground: #ffffff;
-  --border: rgba(0, 0, 0, 0.08);
+  --success: #10b981;
+  --success-foreground: #ffffff;
+  --warning: #f59e0b;
+  --warning-foreground: #ffffff;
+  --border: #e5e7eb;
   --input: #f3f4f6;
-  --ring: #00796b;
+  --ring: #00897b;
+  --radius: 0.5rem;
 
-  --bg-deep: #f8fafc;
+  /* إضافات */
+  --bg-deep: #f1f5f9;
   --bg-hover: rgba(0, 0, 0, 0.04);
-  --accent-hover: #00695c;
+  --accent-hover: #155e75;
   --accent-glow: rgba(0, 150, 136, 0.15);
-  --border-strong: #cbd5e1;
-  --shadow-card: 0 4px 12px rgba(0, 0, 0, 0.06);
-  --shadow-hover: 0 8px 24px rgba(0, 0, 0, 0.1);
-
-  --hero-overlay: linear-gradient(
-    to top,
-    rgba(255, 255, 255, 0.95) 0%,
-    rgba(255, 255, 255, 0.6) 50%,
-    rgba(255, 255, 255, 0.1) 100%
-  );
-  --hero-text-shadow: 0 2px 8px rgba(255, 255, 255, 0.8);
+  --border-strong: #d1d5db;
+  --shadow-card: 0 2px 12px rgba(0, 0, 0, 0.06);
+  --shadow-hover: 0 4px 24px rgba(0, 0, 0, 0.1);
+  --hero-overlay: linear-gradient(to top, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.6) 50%, rgba(255,255,255,0.1) 100%);
+  --hero-text-shadow: 0 2px 8px rgba(255,255,255,0.8);
   --glass-bg: rgba(255, 255, 255, 0.7);
   --glass-border: rgba(0, 0, 0, 0.08);
   --glass-blur: blur(12px);
   --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
-
-  --play-btn-bg: #00796b;
+  --play-btn-bg: #00897b;
   --play-btn-text: #ffffff;
   --favorite-btn-bg: rgba(0, 0, 0, 0.05);
   --favorite-btn-border: rgba(0, 0, 0, 0.12);
   --favorite-btn-hover-bg: rgba(0, 0, 0, 0.1);
-
   --rating-star: #eab308;
   --rating-star-empty: #d4d4d4;
   --badge-bg: rgba(0, 0, 0, 0.05);
-  --badge-text: #1a1a1a;
+  --badge-text: #1a1a2e;
   --badge-border: rgba(0, 0, 0, 0.1);
   --skeleton-base: #e2e8f0;
   --skeleton-shine: #f8fafc;
-  --text-on-media: #1a1a1a;
+  --text-on-media: #ffffff;
 
-  --switch-bg: #8bc34a;
-  --switch-border: #8bc34a;
-  --switch-thumb: #334f13;
+  /* الحالة الدلالية */
+  --success-bg: rgba(16, 185, 129, 0.12);
+  --success-border: rgba(16, 185, 129, 0.35);
+  --success-text: #047857;
+  --warning-bg: rgba(245, 158, 11, 0.12);
+  --warning-border: rgba(245, 158, 11, 0.35);
+  --warning-text: #b45309;
+  --danger-bg: rgba(220, 38, 38, 0.1);
+  --danger-border: rgba(220, 38, 38, 0.35);
+  --danger-text: #b91c1c;
+  --info: #0284c7;
+  --info-bg: rgba(2, 132, 199, 0.12);
+  --info-border: rgba(2, 132, 199, 0.35);
+
+  /* إدارية */
+  --admin-scrollbar-thumb: #cbd5e1;
+  --brand-accent: #d5ff00;
+  --brand-accent-foreground: #000000;
+
+  --switch-bg: #00897b;
+  --switch-border: #00897b;
+  --switch-thumb: #ffffff;
   --switch-off-bg: #e5e7eb;
   --switch-off-border: #d1d5db;
   --switch-off-thumb: #ffffff;
-  --dot-indicator: #1a1a1a;
+  --switch-icon-on: #ffffff;
+  --switch-icon-off: #6b7280;
+  --dot-indicator: #00897b;
 }
-
 /* ================================================================
    🔗 ربط المتغيرات مع Tailwind v4
    ================================================================ */
@@ -410,6 +460,27 @@
   --color-border-strong: var(--border-strong);
   --shadow-card: var(--shadow-card);
   --shadow-hover: var(--shadow-hover);
+
+  /* الحالة الدلالية */
+  --color-success-bg: var(--success-bg);
+  --color-success-border: var(--success-border);
+  --color-success-text: var(--success-text);
+  --color-warning-bg: var(--warning-bg);
+  --color-warning-border: var(--warning-border);
+  --color-warning-text: var(--warning-text);
+  --color-danger: var(--destructive);
+  --color-danger-foreground: var(--destructive-foreground);
+  --color-danger-bg: var(--danger-bg);
+  --color-danger-border: var(--danger-border);
+  --color-danger-text: var(--danger-text);
+  --color-info: var(--info);
+  --color-info-bg: var(--info-bg);
+  --color-info-border: var(--info-border);
+
+  /* إدارية */
+  --color-admin-scrollbar-thumb: var(--admin-scrollbar-thumb);
+  --color-brand-accent: var(--brand-accent);
+  --color-brand-accent-foreground: var(--brand-accent-foreground);
 
   /* الميديا */
   --color-glass-bg: var(--glass-bg);
@@ -461,7 +532,7 @@ body {
   width: 4px;
 }
 .custom-sidebar-scroll::-webkit-scrollbar-thumb {
-  background: #242e42;
+  background: var(--admin-scrollbar-thumb);
   border-radius: 10px;
 }
 .custom-sidebar-scroll::-webkit-scrollbar-track {
@@ -469,13 +540,13 @@ body {
 }
 .admin-scroll {
   scrollbar-width: thin;
-  scrollbar-color: #242e42 transparent;
+  scrollbar-color: var(--admin-scrollbar-thumb) transparent;
 }
 .admin-scroll::-webkit-scrollbar {
   width: 4px;
 }
 .admin-scroll::-webkit-scrollbar-thumb {
-  background: #242e42;
+  background: var(--admin-scrollbar-thumb);
   border-radius: 10px;
 }
 .admin-scroll::-webkit-scrollbar-track {
@@ -502,13 +573,27 @@ body {
     inset 0 -2px 4px rgba(255, 255, 255, 0.05);
 }
 
-/* الوضع الفاتح: عكس الاتجاهات (حافة علوية أغمق + سفلية أفتح). */
-.admin-layout[data-theme="light"] .admin-sunken {
+/* الوضع الفاتح: تدرج خفيف + عكس الاتجاهات (حافة علوية أغمق + سفلية أفتح). */
+body.admin-layout[data-theme="light"] .admin-sunken {
+  background-image: linear-gradient(
+    180deg,
+    rgba(0, 0, 0, 0.07) 0%,
+    rgba(0, 0, 0, 0.02) 50%,
+    rgba(0, 0, 0, 0.05) 100%
+  );
   border-top-color: rgba(0, 0, 0, 0.12);
   border-bottom-color: rgba(255, 255, 255, 0.7);
   box-shadow:
     inset 0 2px 6px rgba(0, 0, 0, 0.22),
     inset 0 -1px 3px rgba(255, 255, 255, 0.8);
+}
+
+/* ---------- اللوجو (أبيض مصمم للخلفيات الداكنة) ---------- */
+/* شعار `/estra7ah.svg` أبيض بالتصميم (fill:#fff) مع فلتر `brightness-110`
+   للخلفيات الداكنة؛ في ثيم الإدارة الفاتح نعكسه إلى درجة داكنة قريبة من
+   `--foreground` حتى لا يختفي على خلفية `--card` الفاتحة. */
+body.admin-layout[data-theme="light"] .admin-logo {
+  filter: invert(0.85);
 }
 
 /* ---------- حاوية بارزة (Raised) تحوي صناديق غارقة ---------- */

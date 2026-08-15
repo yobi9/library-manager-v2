@@ -1,7 +1,19 @@
 import { BaseRepository } from "./base-repository";
 import { getDatabase, resolveDbPath } from "../db/db";
+import { getSettingDefinition } from "../settings/settings-registry";
 import fs from "fs/promises";
 import path from "path";
+
+/**
+ * يُقنّع قيمة سرية قبل تسجيلها في سجل تدقيق الإعدادات.
+ *
+ * @param value - القيمة النصية الأصلية (قد تكون `null`).
+ * @returns `"***"` عند وجود قيمة غير فارغة، أو القيمة نفسها (null/فارغة) كما هي.
+ */
+function maskSecretValue(value: string | null): string | null {
+  if (value === null || value === undefined || value === "") return value;
+  return "***";
+}
 
 /**
  * طبقة الوصول للبيانات الخاصة بالإعدادات.
@@ -58,6 +70,10 @@ export class SettingsRepository extends BaseRepository {
    * @param userId - معرّف المستخدم المسؤول (اختياري، لسجل التدقيق).
    * @param ipAddress - عنوان IP (اختياري، لسجل التدقيق).
    * @returns `{ key, value }` حيث `value` هي التمثيل النصي المخزن.
+   *
+   * @remarks إذا كان الإعداد مسجّلاً في `SETTINGS_REGISTRY` بعلم `isSecret`
+   *          فتُقنّع قيمتا `old_value` و`new_value` في `settings_audit_log`
+   *          (تُستبدل بـ`***`) حتى لا يتسرب المفتاح في سجلات التدقيق.
    */
   async upsertSetting(
     key: string,
@@ -94,6 +110,10 @@ export class SettingsRepository extends BaseRepository {
       // ignore
     }
 
+    const isSecret = getSettingDefinition(key)?.isSecret === true;
+    const auditOldValue = isSecret ? maskSecretValue(oldValue) : oldValue;
+    const auditNewValue = isSecret ? maskSecretValue(normalized) : normalized;
+
     await db.run(
       `INSERT INTO settings (key, value, data_type, updated_at)
        VALUES (?, ?, ?, CURRENT_TIMESTAMP)
@@ -108,7 +128,7 @@ export class SettingsRepository extends BaseRepository {
       await db.run(
         `INSERT INTO settings_audit_log (setting_key, old_value, new_value, changed_at, user_id, ip_address)
          VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?, ?)`,
-        [key, oldValue, normalized, userId ?? null, ipAddress ?? null],
+        [key, auditOldValue, auditNewValue, userId ?? null, ipAddress ?? null],
       );
     } catch {
       // audit log failure is non-fatal

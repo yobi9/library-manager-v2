@@ -462,11 +462,28 @@ export class CacheService {
   }
 }
 
-let _cacheInstance: CacheService | null = null;
+/** مفتاح تخزين مثيل الكاش على `globalThis`. */
+const CACHE_INSTANCE_STATE_KEY = "__libraryManagerCacheInstance";
 
+const globalCacheInstance = (globalThis as Record<string, unknown>)[CACHE_INSTANCE_STATE_KEY] as
+  CacheService | null | undefined;
+
+let _cacheInstance: CacheService | null = globalCacheInstance ?? null;
+
+/**
+ * يُنشئ مثيل الكاش الوحيد أو يسترجع الموجود.
+ *
+ * يُحفظ على `globalThis` بدل حالة الوحدة (نفس سبب `getServices()`): إعادة تقييم
+ * الوحدة في وضع التطوير كانت تُنشئ مثيلاً جديداً يمسح الكاش المشترك ويشغّل
+ * مؤقّتي تنظيف مكرّرين لكل إعادة ترجمة.
+ *
+ * @param activityRepo - مستودع الأنشطة المستخدم عند الإنشاء الأول فقط.
+ * @returns مثيل الكاش الوحيد للعملية الحالية.
+ */
 export function getCacheService(activityRepo?: ActivityRepository): CacheService {
   if (!_cacheInstance) {
     _cacheInstance = new CacheService(activityRepo ?? new ActivityRepository());
+    (globalThis as Record<string, unknown>)[CACHE_INSTANCE_STATE_KEY] = _cacheInstance;
   }
   return _cacheInstance;
 }

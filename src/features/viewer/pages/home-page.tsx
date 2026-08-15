@@ -131,11 +131,19 @@ export default function HomePage() {
       <div className="container mx-auto px-3 sm:px-4 md:px-6 lg:px-8">
         
         {/* استدعاء مباشر: المسافات تُحسب داخلياً لحماية الصفحة عند الاختفاء التام */}
-        <PinnedSlider />
+         {/* 1. سلايدر المثبتة مع مسافة سفلية */}
+       
+          <PinnedSlider />
+         
+        {/* 2. سلايدر المفضلة */}
+       
+          <FavoritesSlider />
+    
 
-        <FavoritesSlider />
-
+   {/* 3.    سلايدر احدث الايتم لكل نوع سلايدر  حسب النوع      */}
+    
         <EnabledTypeSections settings={settings ?? {}} libraries={libraries} />
+    
 
         {/* قسم الشبكة الأخير: متميز بمسافته الخارجية المستقلة (mt) والداخلية لعنوانه (py) */}
         <div className="mt-4 sm:mt-6 md:mt-8 py-4 sm:py-6 pb-16">

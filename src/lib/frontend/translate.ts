@@ -108,6 +108,7 @@ export function translateMediaType(type?: string): string {
   if (type.startsWith("series_")) return "مسلسل";
   if (type === "main") return "رئيسي";
   if (type === "library") return "مكتبة";
+
   return "محتوى";
 }
 

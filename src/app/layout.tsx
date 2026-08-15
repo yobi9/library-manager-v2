@@ -1,10 +1,12 @@
 //src\app\layout.tsx
 import type { Metadata, Viewport } from "next";
+import Script from "next/script";
 
 import localFont from "next/font/local"; // 1. استيراد أداة الخطوط المحلية
 import { Providers } from "@/providers";
 import { APP_NAME, APP_DESCRIPTION } from "@/shared/constants";
 import "./globals.css";
+ 
 // 2. إعداد خط Estra7ah بأوزانه الثلاثة كمصفوفة داخل كائن واحد
 const estra7ah = localFont({
   src: [
@@ -116,12 +118,27 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html
+
+    
       lang="ar"
       dir="rtl"
       className={`${estra7ah.variable} ${ibmPlexSansArabic.variable} ${ibmPlexMono.variable} h-full`}
       suppressHydrationWarning
     >
-      <body className="bg-background font-estra7ah text-foreground flex min-h-full flex-col antialiased">
+   
+
+      <body
+        className="bg-background font-estra7ah text-foreground flex min-h-full flex-col antialiased"
+        suppressHydrationWarning
+      >
+        {/* سكربت يمنع وميض ثيم الإدارة: يُنفَّذ قبل أول طلاء (Pre-Paint) */}
+        <Script
+          id="admin-theme-script"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var s=localStorage.getItem("admin_dashboard_theme"),t=s==="light"||s==="dark"?s:"dark",b=document.body;if(b){b.classList.add("admin-layout");b.setAttribute("data-theme",t)}}catch(e){}})();`,
+          }}
+        />
         {/* 4. قمنا بتغيير الخط الافتراضي في الـ body من font-sans إلى font-estra7ah ليصبح الخط الأساسي للموقع */}
         <Providers>{children}</Providers>
       </body>

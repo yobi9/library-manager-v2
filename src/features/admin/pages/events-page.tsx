@@ -230,18 +230,18 @@ function getActionLabel(action: string): string {
 
 /** فئات الشارات الملونة حسب الحالة (يغطي النص بالكامل بتباين عالٍ). */
 const STATUS_CHIP_CLASSES: Record<EventStatus, string> = {
-  success: "bg-emerald-600 text-white",
-  error: "bg-red-700 text-white",
-  warning: "bg-amber-600 text-white",
-  info: "bg-muted text-foreground",
+  success: "bg-success text-success-foreground",
+  error: "bg-danger text-danger-foreground",
+  warning: "bg-warning text-warning-foreground",
+  info: "bg-info-bg text-info",
 };
 
 /** فئات الشارات الملونة لأحداث الأمان حسب نوع الحدث. */
 const SECURITY_CHIP_CLASSES: Record<string, string> = {
-  login_failed: "bg-amber-600 text-white",
-  user_blocked: "bg-red-700 text-white",
-  user_unblocked: "bg-emerald-600 text-white",
-  password_changed: "bg-emerald-600 text-white",
+  login_failed: "bg-warning text-warning-foreground",
+  user_blocked: "bg-danger text-danger-foreground",
+  user_unblocked: "bg-success text-success-foreground",
+  password_changed: "bg-success text-success-foreground",
 };
 
 /**
@@ -485,7 +485,7 @@ export function EventsPage() {
             <span
               className={cn(
                 "h-2.5 w-2.5 rounded-full transition-colors",
-                connected ? "bg-emerald-500" : "bg-red-500",
+                connected ? "bg-success" : "bg-danger",
               )}
               aria-hidden
             />
@@ -519,8 +519,8 @@ export function EventsPage() {
 
         {/* بانر الخطأ عند فشل جلب السجل */}
         {isError && (
-          <div className="flex items-center justify-between gap-3 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3">
-            <p className="text-sm text-red-400">
+            <div className="flex items-center justify-between gap-3 rounded-xl border border-danger-border bg-danger-bg px-4 py-3">
+            <p className="text-sm text-danger-text">
               {error instanceof Error ? error.message : "فشل تحميل الأحداث"}
             </p>
             <Button variant="outline" size="sm" onClick={() => void refetch()}>

@@ -42,10 +42,11 @@ const INTERVAL_OPTIONS = [
 /**
  * صفحة "قاعدة البيانات والنسخ الاحتياطية".
  *
- * تتيح للمدير: إنشاء نسخة احتياطية فورية، استعادة نسخة من ملف `.db`، العودة
- * إلى وضع المصنع (تصفير البيانات)، تفعيل النسخ التلقائي مع تحديد المدة،
- * عرض قائمة النسخ المحلية وتنزيلها. تُعرض إحصائيات قاعدة البيانات وزر تحسين
- * كجزء مكمّل من نفس الشاشة.
+ * تتيح للمدير: إنشاء نسخة احتياطية فورية تُحفظ في `data/backups` وتظهر في
+ * قائمة النسخ بزر تنزيل، استعادة نسخة من ملف `.db`، العودة إلى وضع المصنع
+ * (تصفير البيانات)، تفعيل النسخ التلقائي مع تحديد المدة، وتنزيل أي نسخة
+ * موجودة عبر الزر (الزر يقرأ الملف الموجود ولا يُنشئ ملفاً جديداً).
+ * تُعرض إحصائيات قاعدة البيانات وزر تحسين كجزء مكمّل من نفس الشاشة.
  */
 export function DatabasePage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -200,7 +201,7 @@ export function DatabasePage() {
         <p className="text-muted-foreground mt-2 text-sm italic">لا توجد نسخ احتياطية حالياً</p>
       </div>
 
-      {/* النسخ التلقائية المحلية */}
+      {/* النسخ التلقائية في الجهاز — الإعدادات + القائمة بزر التنزيل (تخطيط القديم) */}
       <div className="space-y-3">
         <h2 className="text-lg font-bold">النسخ الاحتياطية التلقائية في الجهاز</h2>
         <div className="flex flex-wrap items-center gap-4">
@@ -220,11 +221,7 @@ export function DatabasePage() {
             />
           )}
         </div>
-      </div>
 
-      {/* قائمة النسخ المحلية */}
-      <div className="space-y-3">
-        <h2 className="text-lg font-bold">النسخ الاحتياطية المحلية</h2>
         {backupsLoading ? (
           <div className="space-y-2">
             {Array.from({ length: 3 }).map((_, i) => (
@@ -232,7 +229,7 @@ export function DatabasePage() {
             ))}
           </div>
         ) : backups.length === 0 ? (
-          <p className="text-muted-foreground py-10 text-center text-sm">
+          <p className="text-muted-foreground py-6 text-center text-sm">
             لا توجد نسخ احتياطية محلية
           </p>
         ) : (

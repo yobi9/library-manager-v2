@@ -1,6 +1,8 @@
 import { getEventBus } from "./event-bus";
+import { runInWriterContext } from "../db/db";
 import { MediaRepository } from "../repositories/media-repository";
 import { EnrichmentMediaRepository } from "../repositories/enrichment-media-repository";
+import { SearchRepository } from "../repositories/search-repository";
 import { ActivityRepository } from "../repositories/activity-repository";
 
 /** A row of the media_people table as accepted/serialized by the manual metadata update flow. */
@@ -15,9 +17,18 @@ export interface MetadataPersonRow {
 }
 
 export class MetadataService {
+  /**
+   * يبني الخدمة مع مستودعاتها واعتمادياتها.
+   *
+   * @param mediaRepo - مستودع عناصر الوسائط (التحديثات وحالة الإثراء).
+   * @param enrichmentRepo - مستودع بيانات الإثراء (الأصناف والطاقم).
+   * @param searchRepo - مستودع فهرس البحث FTS5 (لمزامنة `media_search` بعد التعديل اليدوي).
+   * @param activityRepo - مستودع سجل الأنشطة (اختياري).
+   */
   constructor(
     private mediaRepo: MediaRepository,
     private enrichmentRepo: EnrichmentMediaRepository,
+    private searchRepo: SearchRepository,
     private activityRepo?: ActivityRepository,
   ) {}
 
@@ -34,6 +45,11 @@ export class MetadataService {
    * @param data - Edit payload from the admin form.
    * @returns `{ success: true, message }` or `{ success: false, error, statusCode, existingId, existingTitle }`
    *          when the new title duplicates an existing title in the same library.
+   *
+   * تُنفَّذ كل الكتابات (التحديث + الأصناف + الطاقم) داخل `runInWriterContext`
+   * و `withTransaction` (SAVEPOINT) كي تكون العملية ذرّية، ثم يُعاد توليف صف
+   * `media_search` عبر `addToIndex` حتى تنعكس الأصناف والطاقم الجديدة على
+   * فهرس البحث فوراً.
    */
   async updateMetadataManually(
     mediaId: number,
@@ -93,24 +109,31 @@ export class MetadataService {
       }
     }
 
-    await this.mediaRepo.update(mediaId, updatePayload);
-    await this.mediaRepo.refreshEnrichmentStatus(mediaId);
+    await runInWriterContext(async () => {
+      await this.enrichmentRepo.withTransaction(async () => {
+        await this.mediaRepo.update(mediaId, updatePayload);
+        await this.mediaRepo.refreshEnrichmentStatus(mediaId);
 
-    if (Array.isArray(data.tags))
-      await this.enrichmentRepo.saveGenres(
-        mediaId,
-        (data.tags as string[]).map((t) => t.trim()),
-      );
+        if (Array.isArray(data.tags))
+          await this.enrichmentRepo.saveGenres(
+            mediaId,
+            (data.tags as string[]).map((t) => t.trim()),
+          );
 
-    if (Array.isArray(data.people)) {
-      const people = data.people.filter(
-        (p): p is MetadataPersonRow =>
-          !!p && typeof p === "object" && typeof (p as Record<string, unknown>).name === "string",
-      );
-      await this.enrichmentRepo.savePeople(mediaId, people);
-    } else {
-      await this.enrichmentRepo.savePeople(mediaId, this._buildPeopleFromLegacy(data));
-    }
+        if (Array.isArray(data.people)) {
+          const people = data.people.filter(
+            (p): p is MetadataPersonRow =>
+              !!p &&
+              typeof p === "object" &&
+              typeof (p as Record<string, unknown>).name === "string",
+          );
+          await this.enrichmentRepo.savePeople(mediaId, people);
+        } else {
+          await this.enrichmentRepo.savePeople(mediaId, this._buildPeopleFromLegacy(data));
+        }
+      });
+      await this.searchRepo.addToIndex(mediaId);
+    });
 
     getEventBus().emit("media:changed", { id: mediaId });
     this._logSystemEvent("metadata_manual_edit", {

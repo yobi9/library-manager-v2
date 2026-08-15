@@ -132,7 +132,7 @@ export function LicensePage() {
         <Card>
           <CardContent className="flex flex-col items-center gap-2 py-6 text-center">
             {isActivated ? (
-              <CheckCircle className="h-10 w-10 text-green-500" />
+              <CheckCircle className="h-10 w-10 text-success-text" />
             ) : (
               <ShieldX className="text-destructive h-10 w-10" />
             )}
@@ -185,7 +185,7 @@ export function LicensePage() {
       {isActivated ? (
         <Card>
           <CardContent className="flex flex-col items-center gap-2 py-10 text-center">
-            <CheckCircle className="h-16 w-16 text-green-500" />
+            <CheckCircle className="h-16 w-16 text-success-text" />
             <h2 className="text-2xl font-bold">الترخيص نشط</h2>
             <p className="text-muted-foreground">البرنامج مرخص بشكل صحيح</p>
             {status?.clientName && (

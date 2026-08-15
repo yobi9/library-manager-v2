@@ -75,6 +75,7 @@ export interface AdminSettings extends PublicSettings {
   deep_scan_enabled?: boolean;
   image_storage_root?: string;
   image_placeholder_dir?: string;
+  tmdb_api_key?: string;
   auto_backup_enabled?: boolean;
   auto_backup_interval_hours?: number;
   listen_address?: string;

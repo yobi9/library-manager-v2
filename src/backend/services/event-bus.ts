@@ -37,10 +37,7 @@ export class EventBus {
     this._handlerCount--;
   }
 
-  private _removeHandler(
-    event: string,
-    handler: (...args: unknown[]) => void,
-  ): void {
+  private _removeHandler(event: string, handler: (...args: unknown[]) => void): void {
     if (this._emitter.listeners(event).includes(handler)) {
       this._emitter.off(event, handler);
       this._handlerCount--;
@@ -98,11 +95,27 @@ export class EventBus {
   }
 }
 
-let _eventBusInstance: EventBus | null = null;
+/** مفتاح تخزين مثيل الحافلة على `globalThis`. */
+const EVENT_BUS_STATE_KEY = "__libraryManagerEventBusInstance";
 
+const globalEventBusInstance = (globalThis as Record<string, unknown>)[EVENT_BUS_STATE_KEY] as
+  EventBus | null | undefined;
+
+let _eventBusInstance: EventBus | null = globalEventBusInstance ?? null;
+
+/**
+ * يُنشئ حافلة الأحداث الوحيدة أو يسترجع الموجود.
+ *
+ * يُحفظ على `globalThis` بدل حالة الوحدة (نفس سبب `getServices()`): إعادة تقييم
+ * الوحدة في وضع التطوير كانت تُنشئ حافلة جديدة فتنفصل مستقبلات الخدمات
+ * (`CacheInvalidator`، مشغّل أحداث SSE) عن باثّاتها.
+ *
+ * @returns حافلة الأحداث الوحيدة للعملية الحالية.
+ */
 export function getEventBus(): EventBus {
   if (!_eventBusInstance) {
     _eventBusInstance = new EventBus();
+    (globalThis as Record<string, unknown>)[EVENT_BUS_STATE_KEY] = _eventBusInstance;
   }
   return _eventBusInstance;
 }

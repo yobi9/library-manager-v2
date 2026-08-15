@@ -236,7 +236,7 @@ export function UsersPage() {
                   title={user.is_blocked ? "إلغاء الحظر" : "حظر"}
                 >
                   {user.is_blocked ? (
-                    <CheckCircle className="h-4 w-4 text-green-500" />
+                    <CheckCircle className="h-4 w-4 text-success-text" />
                   ) : (
                     <Ban className="text-destructive h-4 w-4" />
                   )}
@@ -354,7 +354,7 @@ export function UsersPage() {
                       title={user.is_blocked ? "إلغاء الحظر" : "حظر"}
                     >
                       {user.is_blocked ? (
-                        <CheckCircle className="h-4 w-4 text-green-500" />
+                        <CheckCircle className="h-4 w-4 text-success-text" />
                       ) : (
                         <Ban className="text-destructive h-4 w-4" />
                       )}

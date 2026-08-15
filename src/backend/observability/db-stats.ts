@@ -28,6 +28,8 @@ export type DbDriverMethod = "all" | "get" | "run" | "exec";
 
 /** One observed DB statement, passed to {@link recordDbObservation}. */
 export interface DbObservation {
+  /** Which connection the statement ran on (`main` = HTTP path, `writer` = scanner/enrichment). */
+  connection: "main" | "writer";
   /** Driver method used (`all|get|run|exec`). */
   method: DbDriverMethod;
   /** The raw SQL string (only the leading keyword is ever logged). */
@@ -208,6 +210,7 @@ export function recordDbObservation(obs: DbObservation, operationId: string | nu
 
   const fields: LogFields = {
     operationId,
+    connection: obs.connection,
     context: obs.context ?? "",
     operation: keyword,
     method: obs.method,
@@ -218,6 +221,7 @@ export function recordDbObservation(obs: DbObservation, operationId: string | nu
       "db.busy",
       {
         operationId,
+        connection: obs.connection,
         context: obs.context ?? "",
         operation: keyword,
         attempts: obs.attempts,

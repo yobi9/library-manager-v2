@@ -21,7 +21,8 @@ import { ScanController } from "./scan-controller";
 import { LiveStreamController } from "./live-stream-controller";
 import { LicenseController } from "./license-controller";
 
-let controllers: {
+/** نوع حاوية المتحكمات — وحيدة لكل عملية. */
+interface Controllers {
   auth: AuthController;
   media: MediaController;
   library: LibraryController;
@@ -43,8 +44,25 @@ let controllers: {
   scan: ScanController;
   liveStream: LiveStreamController;
   license: LicenseController;
-} | null = null;
+}
 
+/** مفتاح تخزين المتحكمات على `globalThis`. */
+const CONTROLLERS_STATE_KEY = "__libraryManagerControllersState";
+
+const globalControllersState = (globalThis as Record<string, unknown>)[CONTROLLERS_STATE_KEY] as
+  Controllers | null | undefined;
+
+let controllers: Controllers | null = globalControllersState ?? null;
+
+/**
+ * يُنشئ المتحكمات (مربوطة بالخدمات من `getServices()`) أو يسترجعها.
+ *
+ * تُحفظ على `globalThis` بدل حالة الوحدة (نفس سبب `getServices()`): إعادة تقييم
+ * الوحدة في وضع التطوير كانت تُنشئ حاوية جديدة تعيد ضبط جداول جلسات الإثراء/
+ * الترجمة في الذاكرة وتشغّل مؤقّتات تنظيف مكرّرة لكل إعادة ترجمة.
+ *
+ * @returns حاوية المتحكمات الوحيدة للعملية الحالية.
+ */
 export function getControllers() {
   if (controllers) return controllers;
   const s = getServices();
@@ -76,6 +94,7 @@ export function getControllers() {
     liveStream: new LiveStreamController(s.liveStream),
     license: new LicenseController(s.license),
   };
+  (globalThis as Record<string, unknown>)[CONTROLLERS_STATE_KEY] = controllers;
   return controllers;
 }
 

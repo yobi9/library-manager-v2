@@ -206,9 +206,9 @@ export function RequestsPage() {
               </p>
             </div>
             {viewTarget?.reply && (
-              <div className="rounded-lg border border-green-200 bg-green-50 p-4">
-                <p className="mb-1 text-sm font-medium text-green-700">الرد السابق</p>
-                <p className="text-sm whitespace-pre-wrap text-green-800">{viewTarget.reply}</p>
+              <div className="rounded-lg border border-success-border bg-success-bg p-4">
+                <p className="mb-1 text-sm font-medium text-success-text">الرد السابق</p>
+                <p className="text-sm whitespace-pre-wrap text-success-text">{viewTarget.reply}</p>
               </div>
             )}
             <Textarea

@@ -20,6 +20,8 @@ export class AutoBackupScheduler {
   constructor(
     private databaseService: DatabaseService,
     private settingsService: SettingsService,
+    /** اختياري: مسند يعيد `true` عند وجود مسح نشط — يتخطى النسخة الاحتياطية حينها. */
+    private isScanActive?: () => boolean,
   ) {}
 
   /**
@@ -74,6 +76,14 @@ export class AutoBackupScheduler {
   }
 
   private async _runBackup(): Promise<void> {
+    // تخطّي الجولة أثناء مسح نشط: `VACUUM INTO` على الاتصال الرئيسي يتنافس مع
+    // كاتب الماسح على قفل كتابة WAL ويعلق حتى `busy_timeout` أو يفشل — النسخة
+    // تتأجل للدورة التالية (ساعات) والحذف/النسخ المؤجل لا يكسر أي عقد بيانات.
+    if (this.isScanActive?.() === true) {
+      logger.info("autobackup.skip_scan_active", {});
+      return;
+    }
+
     // يُسجَّل كوظيفة خلفية في شجرة العمليات (`background_job` بنوع
     // `auto_backup`) لرصد تداخله الزمني مع أي مسح/وظائف أخرى.
     await trackBackgroundJob(

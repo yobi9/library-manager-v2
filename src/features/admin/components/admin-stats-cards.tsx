@@ -33,7 +33,7 @@ export function AdminStatsCards({ stats }: AdminStatsCardsProps) {
           <div className="mt-2 flex items-baseline gap-2">
             <span className="text-2xl font-bold">{stat.value}</span>
             {stat.change && (
-              <span className="text-sm text-green-500">{stat.change}</span>
+              <span className="text-sm text-success-text">{stat.change}</span>
             )}
           </div>
         </div>

@@ -87,7 +87,7 @@ export const LibraryCard = React.memo(function LibraryCard({
       <div className="absolute inset-0 bg-linear-to-t from-black/80 via-transparent to-black/30" />
 
       {isScanning && (
-        <div className="bg-info/50 absolute inset-x-0 top-0 z-10 h-1">
+        <div className="bg-info-bg absolute inset-x-0 top-0 z-10 h-1">
           <div className="bg-info h-full w-full animate-pulse rounded-full" />
         </div>
       )}
@@ -99,7 +99,7 @@ export const LibraryCard = React.memo(function LibraryCard({
             e.stopPropagation();
             onDelete();
           }}
-          className="flex h-7 w-7 items-center justify-center rounded-full bg-red-500/80 text-white shadow transition-transform hover:scale-110 hover:bg-red-500"
+          className="flex h-7 w-7 items-center justify-center rounded-full bg-danger/80 text-danger-foreground shadow transition-transform hover:scale-110 hover:bg-danger"
           aria-label="حذف"
         >
           <Trash2 size={13} />
@@ -110,7 +110,7 @@ export const LibraryCard = React.memo(function LibraryCard({
             e.stopPropagation();
             onEdit();
           }}
-          className="flex h-7 w-7 items-center justify-center rounded-full bg-green-500/80 text-white shadow transition-transform hover:scale-110 hover:bg-green-500"
+          className="flex h-7 w-7 items-center justify-center rounded-full bg-success/80 text-success-foreground shadow transition-transform hover:scale-110 hover:bg-success"
           aria-label="تعديل"
         >
           <Edit3 size={13} />
@@ -123,8 +123,8 @@ export const LibraryCard = React.memo(function LibraryCard({
           }}
           className={`flex h-7 w-7 items-center justify-center rounded-full shadow transition-transform hover:scale-110 ${
             library.is_pinned
-              ? "bg-amber-400 text-white hover:bg-amber-400"
-              : "bg-slate-500/60 text-white hover:bg-amber-400/70"
+              ? "bg-rating-star text-white hover:bg-rating-star"
+              : "bg-slate-500/60 text-white hover:bg-rating-star/70"
           }`}
           aria-label={library.is_pinned ? "إلغاء التثبيت" : "تثبيت"}
         >
@@ -138,7 +138,7 @@ export const LibraryCard = React.memo(function LibraryCard({
               if (isScanning) onStopScan();
               else onScan();
             }}
-            className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-500/80 text-white shadow transition-transform hover:scale-110 hover:bg-blue-500"
+            className="flex h-7 w-7 items-center justify-center rounded-full bg-info/80 text-info-foreground shadow transition-transform hover:scale-110 hover:bg-info"
             aria-label={isScanning ? "إيقاف المسح" : "مسح"}
           >
             <RefreshCw size={13} className={isScanning ? "animate-spin" : ""} />
@@ -147,7 +147,7 @@ export const LibraryCard = React.memo(function LibraryCard({
       </div>
 
       {pathCount > 0 && !isContainer && (
-        <div className="absolute top-2 right-2  z-10 rounded-full bg-black/50 px-2 py-0.5 text-[10px] font-bold text-white backdrop-blur-sm">
+        <div className="absolute top-2 right-2  z-10 rounded-full bg-black/50 px-2 py-0.5 text-[10px] font-bold text-text-on-media backdrop-blur-sm">
           {pathCount} مسار
         </div>
       )}
@@ -156,7 +156,7 @@ export const LibraryCard = React.memo(function LibraryCard({
        <h3 className="text-base leading-tight font-bold text-white drop-shadow-lg md:text-lg">
           {library.name}
           {count !== undefined && count > 0 && (
-            <span className="me-1 text-sm font-normal text-amber-300">
+            <span className="me-1 text-sm font-normal text-rating-star">
               ({count.toLocaleString("ar-EG")})
             </span>
           )}
@@ -190,10 +190,10 @@ export const LibraryCard = React.memo(function LibraryCard({
 {/* حاوية واحدة موحدة تضم الاسم والشارات معاً في الجهة اليمنى السفلى */}
       <div className="absolute bottom-3 right-4 z-10 flex flex-col items-start gap-1.5">
         {/* 1. اسم المكتبة يظهر في الأعلى */}
-        <h3 className="text-base leading-tight font-bold text-white drop-shadow-lg md:text-lg">
+        <h3 className="text-base leading-tight font-bold text-text-on-media drop-shadow-lg md:text-lg">
           {library.name}
           {count !== undefined && count > 0 && (
-            <span className="me-1 text-sm font-normal text-amber-300">
+            <span className="me-1 text-sm font-normal text-rating-star">
               ({count.toLocaleString("ar-EG")})
             </span>
           )}

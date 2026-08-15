@@ -13,6 +13,7 @@ import { SearchRepository } from "../repositories/search-repository";
 import { ActivityRepository } from "../repositories/activity-repository";
 import { SettingsService } from "./settings-service";
 import { ENRICHED_WEB_PREFIX } from "./image-service";
+import { isAbsoluteDiskPath } from "../utils/path-utils";
 
 /**
  * قائمة حظر SSRF: النطاقات المحلية والعناوين الخاصة (RFC1918 و169.254.0.0/16)
@@ -635,10 +636,10 @@ export class TmdbEnrichmentService extends EventEmitter {
             ? "persons"
             : "";
 
-    const baseDir = path.isAbsolute(storageRoot)
+    const baseDir = isAbsoluteDiskPath(storageRoot)
       ? path.join(storageRoot, typeDir)
       : path.join(process.cwd(), "public", storageDir, typeDir);
-    const urlPrefix = path.isAbsolute(storageRoot)
+    const urlPrefix = isAbsoluteDiskPath(storageRoot)
       ? `${ENRICHED_WEB_PREFIX}${typeDir ? `/${typeDir}` : ""}`
       : `${storageRoot.replace(/\/+$/, "")}${typeDir ? `/${typeDir}` : ""}`;
 

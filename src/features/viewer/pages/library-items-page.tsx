@@ -15,7 +15,7 @@ import { Breadcrumbs } from "@/shared/components/ui/breadcrumbs";
 import { Spinner } from "@/shared/components/ui/spinner";
 import { ROUTES } from "@/shared/constants";
 import { Film, AlertCircle } from "lucide-react";
-import { extractGenres } from "@/lib/frontend/media-helpers";
+import { extractGenres, isItemNew } from "@/lib/frontend/media-helpers";
 
 const SORT_OPTIONS = [
   { value: "recent", label: "تاريخ الإضافة" },
@@ -24,6 +24,11 @@ const SORT_OPTIONS = [
   { value: "alpha", label: "الأبجدية" },
 ];
 
+/**
+ * صفحة قائمة أيتمات مكتبة معيّنة: عرض النتائج مع بحث وفلترة (تصنيف/سنة/شهادة) وفرز وترقيم صفحات.
+ *
+ * @returns صفحة المكتبة كاملة.
+ */
 export default function LibraryItemsPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
@@ -210,7 +215,8 @@ export default function LibraryItemsPage() {
               views={item.views ?? undefined}
               seasonsCount={item.seasons_count ?? item.seasonsCount ?? undefined}
               episodesCount={item.episodes_count ?? item.episodesCount ?? undefined}
-              genres={extractGenres(item).slice(0, 2)}
+              genres={extractGenres(item)}
+              isNew={isItemNew(item.created_at ?? item.createdAt)}
             />
           ))}
         </MediaGrid>

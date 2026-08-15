@@ -19,7 +19,7 @@ export class DatabaseController extends BaseController {
   async createBackup() {
     try {
       const result = await this.databaseService.createBackup();
-      return this.ok(result, "Backup created");
+      return this.ok(result, "تم إنشاء نسخة احتياطية بنجاح");
     } catch (err) {
       return this.handleError(err);
     }

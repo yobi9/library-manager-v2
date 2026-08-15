@@ -1,6 +1,8 @@
 import { LibraryRepository } from "../repositories/library-repository";
 import { MediaRepository } from "../repositories/media-repository";
 import { ActivityRepository } from "../repositories/activity-repository";
+import { logger } from "../observability/logger";
+import { ensureDirs } from "../utils/path-utils";
 import fs from "fs/promises";
 import path from "path";
 // في library-service.ts
@@ -77,7 +79,29 @@ export class LibraryService {
     private libraryRepo: LibraryRepository,
     private mediaRepo: MediaRepository,
     private activityRepo?: ActivityRepository,
-  ) {}
+  ) {
+    // إنشاء مجلد صور المكتبات `public/assets/images/libraries` عند بدء التشغيل
+    // ليكون جاهزاً قبل أول رفع صورة مكتبة — الفشل يُسجَّل فقط ولا يعطّل التشغيل.
+    void this.ensureDirectories();
+  }
+
+  /**
+   * يضمن وجود مجلد صور المكتبات `public/assets/images/libraries` (مسار ثابت
+   * نسبي لجذر المشروع، بلا إعداد مؤثر عليه).
+   *
+   * - السلوك: لا يرمي الخطأ أبداً — الفشل يُسجَّل عبر `logger` فقط.
+   *
+   * @returns وعد ينجز عند ضمان وجود المجلد (أو تسجيل الفشل).
+   */
+  async ensureDirectories(): Promise<void> {
+    try {
+      await ensureDirs([LIBRARY_IMAGES_DIR], "LibraryService");
+    } catch (err) {
+      logger.error("libraries.dirs_ensure_failed", {
+        message: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
 
   async getAllLibraries() {
     const libraries = await this.libraryRepo.getAll();

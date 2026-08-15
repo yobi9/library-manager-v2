@@ -45,6 +45,9 @@ const DEFAULT_FILTERS: ItemsControlFilters = {
 
 const PAGE_LIMIT = 50;
 
+/** مهلة تجميع أحداث تحديث الوسائط قبل إبطال القائمة — تمنع عاصفة إعادة الجلب. */
+const MEDIA_INVALIDATION_DEBOUNCE_MS = 1500;
+
 /** حالة العنصر الجاري تنفيذ إجراء عليه (لتشغيل الأنيميشن في البطاقة). */
 interface BusyState {
   id: number;
@@ -72,10 +75,15 @@ export function ItemsControlPage() {
   const realtime = useAdminRealtimeEvents();
 
   // تحديث القائمة تلقائياً عند تغيّر البيانات من أحداث الخلفية (إثراء/ترجمة/حفظ).
+  // يُدمج الإبطال عبر تأخير قصير: الأحداث المتلاحقة من جلسة خلفية واحدة
+  // (مثل `media:changed` لكل عنصر) تُجمَّع في إعادة جلب واحدة بدل استدعاءات
+  // N متطابقة للـ API مع كل حدث.
   useEffect(() => {
-    if (realtime.mediaVersion > 0) {
+    if (realtime.mediaVersion === 0) return;
+    const timer = setTimeout(() => {
       queryClient.invalidateQueries({ queryKey: adminMediaKeys.all });
-    }
+    }, MEDIA_INVALIDATION_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
   }, [realtime.mediaVersion, queryClient]);
 
   // تأخير البحث 400ms حتى لا يُستدعى الـ API مع كل حرف.
@@ -155,14 +163,19 @@ export function ItemsControlPage() {
     }
   };
 
-  const handleEnrich = useCallback(
-    (item: MediaItem) =>
-      runBusy("enrich", item.media_id, async () => {
-        await enrichItemMutation.mutateAsync(item.media_id);
-        toast.success(`اكتمل إثراء "${item.title}"`);
-      }),
-    [enrichItemMutation],
-  );
+const handleEnrich = useCallback(
+  (item: MediaItem) =>
+    runBusy("enrich", item.media_id, async () => {
+      await enrichItemMutation.mutateAsync({
+        id: item.media_id,
+        downloadImages: enrichmentOptions.downloadImages,
+        downloadCastImages: enrichmentOptions.downloadCastImages,
+        storageMode: enrichmentOptions.storageMode,
+      });
+      toast.success(`اكتمل إثراء "${item.title}"`);
+    }),
+  [enrichItemMutation, enrichmentOptions],
+);
 
   const handleTranslate = useCallback(
     (item: MediaItem) =>

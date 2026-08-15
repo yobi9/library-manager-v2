@@ -83,36 +83,50 @@ export class SearchRepository extends BaseRepository {
   async rebuildIndex() {
     const db = await getDatabase();
 
-    const rows = (await db.all(`
-      SELECT
-        m.media_id,
-        COALESCE(m.title, '') AS title,
-        COALESCE(m.original_title, '') AS original_title,
-        COALESCE(m.overview, '') AS overview,
-        COALESCE(m.created_at, datetime('now')) AS created_at,
-        COALESCE((
-          SELECT GROUP_CONCAT(mg.genre) FROM media_genres mg WHERE mg.media_id = m.media_id
-        ), '') AS genres,
-        COALESCE((
-          SELECT GROUP_CONCAT(mp.name) FROM media_people mp WHERE mp.media_id = m.media_id
-        ), '') AS cast_names
-      FROM media_items m
-      WHERE m.is_available = 1
-        AND m.deleted_at IS NULL
-        AND m.type NOT IN ('season', 'episode')
-    `)) as Record<string, unknown>[];
-
     await db.run("DELETE FROM media_search");
 
-    // إدراج دفعات (100/دفعة) مع حساب المفتاح الصوتي في JS — لا يمكن حسابه في SQL.
-    // تُدار المعاملة عبر `withTransaction` (SAVEPOINT قابل للتطعيس الآمن) بدلاً من
-    // `BEGIN` الخام: الاتصال مشترك (singleton) وقد يكون داخل معاملة مفتوحة في نفس
-    // اللحظة (مثل `cleanupOrphanedItems` بعد اكتمال المسح) — و`BEGIN` الخام داخل
-    // معاملة قائمة يفشل بـ "cannot start a transaction within a transaction".
-    for (let i = 0; i < rows.length; i += INDEX_BATCH_SIZE) {
-      const batch = rows.slice(i, i + INDEX_BATCH_SIZE);
+    // Keyset pagination على `media_id` التصاعدي بدل تحميل الفهرس كله دفعة
+    // واحدة: الكوريليشنات GROUP_CONCAT مع فهرس الماسح الكامل تجعل SELECT
+    // واحداً ضخماً ثقيلاً على الاتصال المشترك — نفس النمط المعتمد في
+    // `backfillMissing`. لا يُفلتَر على `media_search` هنا (إعادة بناء كاملة)
+    // لذا المرشّح يبقى ثابتاً والـ cursor التصاعدي لا يكرر الصفوف.
+    let lastId = 0;
+    let hasMore = true;
+    while (hasMore) {
+      const rows = (await db.all(
+        `SELECT
+          m.media_id,
+          COALESCE(m.title, '') AS title,
+          COALESCE(m.original_title, '') AS original_title,
+          COALESCE(m.overview, '') AS overview,
+          COALESCE(m.created_at, datetime('now')) AS created_at,
+          COALESCE((
+            SELECT GROUP_CONCAT(mg.genre) FROM media_genres mg WHERE mg.media_id = m.media_id
+          ), '') AS genres,
+          COALESCE((
+            SELECT GROUP_CONCAT(mp.name) FROM media_people mp WHERE mp.media_id = m.media_id
+          ), '') AS cast_names
+        FROM media_items m
+        WHERE m.is_available = 1
+          AND m.deleted_at IS NULL
+          AND m.type NOT IN ('season', 'episode')
+          AND m.media_id > ?
+        ORDER BY m.media_id ASC
+        LIMIT ?`,
+        [lastId, INDEX_BATCH_SIZE],
+      )) as Record<string, unknown>[];
+
+      if (rows.length === 0) {
+        hasMore = false;
+        break;
+      }
+
+      // تُدار الدفعة عبر `withTransaction` (SAVEPOINT قابل للتطعيس الآمن) بدلاً من
+      // `BEGIN` الخام: الاتصال مشترك (singleton) وقد يكون داخل معاملة مفتوحة في نفس
+      // اللحظة — و`BEGIN` الخام داخل معاملة قائمة يفشل بـ "cannot start a
+      // transaction within a transaction".
       await this.withTransaction(async () => {
-        for (const row of batch) {
+        for (const row of rows) {
           const phoneticKey = getArabicPhoneticKey(
             `${row["title"]} ${row["original_title"]} ${row["genres"]} ${row["cast_names"]}`,
           );
@@ -133,6 +147,14 @@ export class SearchRepository extends BaseRepository {
           );
         }
       });
+
+      const cursor = rows[rows.length - 1];
+      if (!cursor) {
+        hasMore = false;
+        break;
+      }
+      lastId = Number(cursor["media_id"]);
+      hasMore = rows.length === INDEX_BATCH_SIZE;
     }
   }
 

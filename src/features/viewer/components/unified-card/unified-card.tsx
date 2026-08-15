@@ -11,6 +11,7 @@ import { translateMediaType, formatDuration, formatViews } from "@/lib/frontend/
 export interface UnifiedCardProps {
   id: string;
   title: string;
+
   imageUrl?: string | null;
   year?: number | string | null;
   rating?: number | string | null;
@@ -29,6 +30,16 @@ export interface UnifiedCardProps {
   onClick?: () => void;
 }
 
+/**
+ * بطاقة الوسائط الموحدة المستخدمة في معظم صفحات العارض (الصفحة الرئيسية، الجديد، المتابعة، التوصيات...).
+ *
+ * - عند عدم التمرير: شارة «جديد» (أو أول تصنيف إن لم تكن جديدة) أعلى اليسار، والتقييم أعلى اليمين.
+ * - عند التمرير: تظهر طبقة داكنة تعرض زر التشغيل وشارة النوع والشهادة والتصنيفات في الشريط السفلي،
+ *   بينما تبقى الشارات العلوية ظاهرة.
+ *
+ * @param props - خصائص البطاقة الموحدة (المعرف، العنوان، الصورة، السنة، التقييم، التصنيفات، نوع الوسائط...).
+ * @returns عنصر رابط أو حاوية بسيطة وفق توفر `href`.
+ */
 export function UnifiedCard({
   id,
   title,
@@ -93,7 +104,18 @@ export function UnifiedCard({
           />
 
           <div className="absolute inset-e-1.5 top-1.5 z-40">
-            {isNew && <Badge className="bg-green-600 text-[10px] text-white">جديد</Badge>}
+            {isNew ? (
+              <Badge className="bg-green-600 text-[10px] text-white">جديد</Badge>
+            ) : (
+              genresList.length > 0 && (
+                <Badge
+                  variant="outline"
+                  className="border-white/30 bg-black/60 text-[10px] text-white backdrop-blur-sm"
+                >
+                  {genresList[0]}
+                </Badge>
+              )
+            )}
           </div>
 
           {formattedRating && (
@@ -201,11 +223,10 @@ export function UnifiedCard({
     className,
   );
 
-  const cardClasses = cn(
-    "bg-transparent border border-transparent",
-    isSelected && "ring-2 ring-primary",
-  );
-
+const cardClasses = cn(
+  "bg-transparent border border-transparent rounded-lg transition-all duration-300",
+  isSelected && "ring-4 ring-ring ring-offset-2 ring-offset-background shadow-lg shadow-ring/25 scale-[1.02]"
+);
   if (resolvedHref) {
     return (
       <div className={wrapperClasses}>

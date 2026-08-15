@@ -39,6 +39,8 @@ export type SettingCategory =
  * @property maxLength - أقصى طول للنص عندما يكون `type` مساوياً `"string"`.
  * @property description - وصف وظيفي للإعداد.
  * @property legacy - إعداد موروث من البنية القديمة بلا مستهلك حي في النظام الجديد.
+ * @property isSecret - إعداد سري تُقنّع قيمته (القديمة والجديدة) في
+ *          `settings_audit_log` حتى لا يتسرب في السجلات (مثل مفتاح API).
  */
 export interface SettingDefinition {
   key: string;
@@ -52,6 +54,7 @@ export interface SettingDefinition {
   maxLength?: number;
   description: string;
   legacy?: boolean;
+  isSecret?: boolean;
 }
 
 /**
@@ -313,10 +316,10 @@ export const SETTINGS_REGISTRY: readonly SettingDefinition[] = [
     key: "storage_mode",
     type: "enum",
     defaultValue: "local",
-    enumValues: ["local", "s3", "both"],
+    enumValues: ["local", "media_folder" ],
     category: "storage",
     isPublic: true,
-    description: "طريقة تخزين الصور/الوسائط: محلي، سحابي (S3)، أو كلاهما.",
+    description: "طريقة تخزين الصور/الوسائط: في مجلد عنصر الميديا  (media_folder)،  ",
   },
   {
     key: "download_images",
@@ -360,6 +363,17 @@ export const SETTINGS_REGISTRY: readonly SettingDefinition[] = [
     isPublic: false,
     maxLength: 500,
     description: "المسار الأساسي (نسبي لجذر الويب) لصور placeholders (SVG).",
+  },
+  {
+    key: "tmdb_api_key",
+    type: "string",
+    defaultValue: "",
+    category: "storage",
+    isPublic: false,
+    maxLength: 500,
+    isSecret: true,
+    description:
+      "مفتاح TMDB API لخدمة الإثراء — يُثبَّت في قاعدة البيانات عند حفظه من منصة التحكم، ويُحمَّل عند بدء الخدمة ليفعَّل في الذاكرة بعد إعادة التشغيل. قيمته السرية تُقنّع في سجل تدقيق الإعدادات.",
   },
 
   // ============ Backup ============

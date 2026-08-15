@@ -13,6 +13,8 @@
  * - {@link recordDbObservation} / {@link snapshotDbStats} /
  *   {@link diffDbStats} / {@link recordExclusiveWait} — global SQLite
  *   workload counters for bottleneck reports.
+ * - {@link traceGenresHealth} / {@link genresHealth} — dev-only health trace
+ *   for the `genres` field across the backend list layers (debug level).
  *
  * Developer-only: the console is disabled in production; nothing here touches
  * the event bus, SSE, the database or any admin/UI surface.
@@ -44,3 +46,6 @@ export {
   diffDbStats,
 } from "./db-stats";
 export type { DbObservation, DbStatsSnapshot, DbDriverMethod, DbOperationType } from "./db-stats";
+
+export { genresHealth, traceGenresHealth } from "./genres-trace";
+export type { GenresHealth } from "./genres-trace";

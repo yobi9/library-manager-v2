@@ -189,7 +189,7 @@ export function ExclusiveFormModal({ open, onClose, onSubmit }: ExclusiveFormMod
                     <Star
                       className={
                         star <= (form.rating ?? 0)
-                          ? "fill-yellow-400 text-yellow-400"
+                          ? "fill-rating-star text-rating-star"
                           : "text-muted-foreground"
                       }
                     />

@@ -3,6 +3,8 @@ import { ActivityRepository } from "../repositories/activity-repository";
 import { CacheService } from "./cache-service";
 import { CachePrefixes } from "./cache-prefixes";
 import { closeDatabase } from "../db/db";
+import { logger } from "../observability/logger";
+import { ensureDirs } from "../utils/path-utils";
 import fs from "fs/promises";
 import path from "path";
 
@@ -37,7 +39,51 @@ export class DatabaseService {
   constructor(
     private activityRepo: ActivityRepository,
     private cache: CacheService,
-  ) {}
+    /** اختياري: مسند يعيد `true` عند وجود مسح نشط — يرفض العمليات المدمرة/الصيانة حينها. */
+    private isScanActive?: () => boolean,
+  ) {
+    // إنشاء مجلد النسخ الاحتياطية `data/backups` عند بدء التشغيل (أول بناء
+    // للخدمة) — أي فشل يُسجَّل فقط ولا يعطّل تهيئة باقي الخدمات.
+    void this.ensureDirectories();
+  }
+
+  /**
+   * يضمن وجود مجلد النسخ الاحتياطية المحلية `data/backups` المستخدم من
+   * النسخ التلقائية (`AutoBackupScheduler`) وقائمة النسخ المحلية.
+   *
+   * - المسار مصدره `getBackupDir()` (ثابت نسبي لجذر المشروع) فلا يوجد إعداد
+   *   مؤثر عليه ولا اشتراك في أحداث `settings_updated`.
+   * - السلوك: لا يرمي الخطأ أبداً — الفشل يُسجَّل عبر `logger` فقط.
+   *
+   * @returns وعد ينجز عند ضمان وجود المجلد (أو تسجيل الفشل).
+   */
+  async ensureDirectories(): Promise<void> {
+    try {
+      await ensureDirs([this.getBackupDir()], "DatabaseService");
+    } catch (err) {
+      logger.error("database.dirs_ensure_failed", {
+        message: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  /**
+   * يرفض تنفيذ عملية كتابة/صيانة ثقيلة على القاعدة أثناء مسح نشط.
+   *
+   * `VACUUM INTO` و`PRAGMA optimize` و`truncateAll` واستبدال الملف كلها عمليات
+   * تتنافس مع كاتب الماسح على قفل كتابة WAL (وتصل أحياناً إلى إغلاق الاتصال
+   * نفسه في حالة الاستعادة) — الحارس يعيد رسالة عربية واضحة بدل فشل غامض.
+   *
+   * @param action - وصف العملية المرفوضة لعرضه في رسالة الخطأ.
+   * @throws Error عندما يكون مسح قيد التشغيل.
+   */
+  private guardAgainstActiveScan(action: string): void {
+    if (this.isScanActive?.() === true) {
+      throw new Error(
+        `لا يمكن ${action} أثناء مسح قيد التشغيل؛ انتظر اكتمال المسح ثم أعد المحاولة`,
+      );
+    }
+  }
 
   /**
    * Returns database size, table list and total record count.
@@ -63,7 +109,21 @@ export class DatabaseService {
     );
   }
 
+  /**
+   * ينشئ نسخة احتياطية كاملة من قاعدة البيانات في مجلد `data/backups` باسم
+   * يحمل الطابع الزمني (`backup-{ISO-بتوقيت-غرينتش}.db`) ويُبقيها على القرص.
+   *
+   * - المصدر الوحيد لإنشاء النسخ: تستخدمه النسخة اليدوية («إنشاء نسخة الآن»)
+   *   والجدولة التلقائية (`AutoBackupScheduler`) معاً — لا يُنشأ أي ملف عند
+   *   النقر على زر التنزيل؛ الزر يقرأ الملف الموجود فقط.
+   * - السلوك: `VACUUM INTO` إلى المسار النهائي ثم تسجيل حدث `db_backup`
+   *   وإبطال كاش إحصاءات قاعدة البيانات.
+   *
+   * @returns مسار الملف المُنشأ وحجمه المنسّق لعرضه في القائمة.
+   * @throws عندما يكون مسح قيد التشغيل أو يفشل إنشاء النسخة نفسها.
+   */
   async createBackup() {
+    this.guardAgainstActiveScan("إنشاء نسخة احتياطية");
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
     const backupDir = this.getBackupDir();
     await fs.mkdir(backupDir, { recursive: true });
@@ -82,6 +142,7 @@ export class DatabaseService {
   }
 
   async optimize() {
+    this.guardAgainstActiveScan("تحسين قاعدة البيانات");
     await this.dbRepo.optimize();
     await this.activityRepo.logActivity({
       entityType: "system",
@@ -145,6 +206,9 @@ export class DatabaseService {
    * @param file - Uploaded backup file (`.db` only in the new format).
    */
   async restoreBackup(file: File): Promise<void> {
+    // الحارس هنا أشد أهمية: الاستعادة تغلق اتصال الكاتب (`closeDatabase`) حتى
+    // لو كان الماسح في منتصف سياقه، فيكمل على كائن مغلق ويفشل بلا سبب واضح.
+    this.guardAgainstActiveScan("استعادة قاعدة البيانات");
     const ext = path.extname(file.name).toLowerCase();
     if (ext !== ".db") {
       throw new Error("الرجاء رفع ملف نسخة احتياطية بصيغة .db");
@@ -176,6 +240,7 @@ export class DatabaseService {
    * Resets all user data by truncating every non-system table.
    */
   async performFactoryReset(): Promise<void> {
+    this.guardAgainstActiveScan("تصفير قاعدة البيانات");
     // لا يمكن تسجيل factory_reset في `activities`/`security_events` لأن
     // truncateAll يمسح هذين الجدولين — نكتفي بسطر سجل للعامل لا يُمحى.
     console.warn("[DatabaseService] Factory reset executed — all user data truncated.");

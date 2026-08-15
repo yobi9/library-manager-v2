@@ -24,6 +24,7 @@ import {
   type MediaPersonRow,
   type ItemMetadataPayload,
 } from "@/features/admin/hooks/use-admin-media";
+import { useAdminSettings } from "@/features/admin/hooks/use-admin-settings";
 import { ChipInputField } from "@/features/admin/components/items-control/ChipInputField";
 import type { MediaItem } from "@/lib/frontend/api-media";
 import { MEDIA_TYPE_OPTIONS } from "@/lib/frontend/translate";
@@ -77,37 +78,68 @@ export function ItemManagementDialog({
 
 /** حالة النموذج الكاملة (قيم نصية لسهولة التحرير). */
 interface EditFormState {
+ 
+
+
+  // الأساسية
   title: string;
+  original_title: string;
   runtime: string;
   year: string;
+  release_date: string;
+  // الوصف
   overview: string;
+ 
+  tagline: string;
+  // التقييمات
   imdb_rating: string;
   imdb_votes: string;
   certification: string;
+  // الجغرافيا
   country: string;
+  origin_country: string;
   language: string;
+  // الصور
   poster_path: string;
   backdrop_path: string;
+  // المعرفات
   tmdb_id: string;
+  // الطاقم والتصنيفات
   cast: string[];
   directors: string[];
   writers: string[];
   tags: string[];
+  // الحالة
   type: string;
   is_pinned: boolean;
   is_available: boolean;
+  sort_order: string;
+  // إضافات
+ 
+  trailer_url: string;
+  logo_url: string;
+
+
+
+
+
 }
 
 /** حالة النموذج الابتدائية قبل جلب البيانات. */
 const EMPTY_FORM: EditFormState = {
   title: "",
+  original_title: "",
   runtime: "",
   year: "",
+  release_date: "",
   overview: "",
+  
+  tagline: "",
   imdb_rating: "",
   imdb_votes: "",
   certification: "",
   country: "",
+  origin_country: "",
   language: "",
   poster_path: "",
   backdrop_path: "",
@@ -119,6 +151,10 @@ const EMPTY_FORM: EditFormState = {
   type: "movie",
   is_pinned: false,
   is_available: true,
+  sort_order: "",
+ 
+  trailer_url: "",
+  logo_url: "",
 };
 
 /**
@@ -144,6 +180,9 @@ function ItemManagementForm({
   const [saving, setSaving] = useState(false);
   const [enriching, setEnriching] = useState(false);
   const [downloading, setDownloading] = useState<"poster" | "backdrop" | null>(null);
+  const { data: settings } = useAdminSettings();
+const storageMode = settings?.storage_mode ?? "local";
+console.log("📦 Storage mode:", storageMode);
   const [previewImage, setPreviewImage] = useState<{ url: string; title: string } | null>(null);
 
   const [form, setForm] = useState<EditFormState>(EMPTY_FORM);
@@ -176,27 +215,36 @@ function ItemManagementForm({
         people.filter((p) => p.role === role).map((p) => p.name);
 
       setOriginalPeople(people);
-      setForm({
-        title: details.title ?? "",
-        runtime: details.runtime ? String(details.runtime) : "",
-        year: details.release_date || (details.year ? String(details.year) : ""),
-        overview: details.overview ?? "",
-        imdb_rating: details.imdb_rating != null ? String(details.imdb_rating) : "",
-        imdb_votes: details.imdb_votes != null ? String(details.imdb_votes) : "",
-        certification: details.certification ?? "",
-        country: details.country ?? "",
-        language: details.language ?? "",
-        poster_path: details.poster_path ?? "",
-        backdrop_path: details.backdrop_path ?? "",
-        tmdb_id: details.tmdb_id != null ? String(details.tmdb_id) : "",
-        cast: namesByRole("Actor"),
-        directors: namesByRole("Director"),
-        writers: namesByRole("Writer"),
-        tags: details.genres ?? [],
-        type: details.type ?? "movie",
-        is_pinned: !!details.is_pinned,
-        is_available: !!details.is_available,
-      });
+setForm({
+  title: details.title ?? "",
+  original_title: details.original_title ?? "",
+  runtime: details.runtime ? String(details.runtime) : "",
+  year: details.year ? String(details.year) : "",
+  release_date: details.release_date ?? "",
+  overview: details.overview ?? "",
+ 
+  tagline: details.tagline ?? "",
+  imdb_rating: details.imdb_rating != null ? String(details.imdb_rating) : "",
+  imdb_votes: details.imdb_votes != null ? String(details.imdb_votes) : "",
+  certification: details.certification ?? "",
+  country: details.country ?? "",
+  origin_country: details.origin_country ?? "",
+  language: details.language ?? "",
+  poster_path: details.poster_path ?? "",
+  backdrop_path: details.backdrop_path ?? "",
+  tmdb_id: details.tmdb_id != null ? String(details.tmdb_id) : "",
+  cast: namesByRole("Actor"),
+  directors: namesByRole("Director"),
+  writers: namesByRole("Writer"),
+  tags: details.genres ?? [],
+  type: details.type ?? "movie",
+  is_pinned: !!details.is_pinned,
+  is_available: !!details.is_available,
+  sort_order: details.sort_order != null ? String(details.sort_order) : "",
+ 
+  trailer_url: details.trailer_url ?? "",
+  logo_url: details.logo_url ?? "",
+});
       return true;
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "فشل تحميل البيانات");
@@ -300,26 +348,34 @@ function ItemManagementForm({
 
   /** حفظ كامل التعديلات عبر نقطة البيانات الوصفية اليدوية. */
   const handleSubmit = async () => {
-    const payload: ItemMetadataPayload = {
-      title: form.title || undefined,
-      overview: form.overview || undefined,
-      runtime: form.runtime ? Number(form.runtime) : undefined,
-      release_date: form.year || undefined,
-      year: form.year ? Number(form.year) || undefined : undefined,
-      imdb_rating: form.imdb_rating ? Number(form.imdb_rating) : undefined,
-      imdb_votes: form.imdb_votes ? Number(form.imdb_votes) : undefined,
-      certification: form.certification || undefined,
-      tmdb_id: form.tmdb_id ? Number(form.tmdb_id) : undefined,
-      country: form.country || undefined,
-      language: form.language || undefined,
-      poster_path: form.poster_path,
-      backdrop_path: form.backdrop_path,
-      tags: form.tags,
-      people: buildPeople(),
-      type: form.type,
-      is_pinned: form.is_pinned,
-      is_available: form.is_available,
-    };
+const payload: ItemMetadataPayload = {
+  title: form.title || undefined,
+  original_title: form.original_title || undefined,
+  overview: form.overview || undefined,
+ 
+  tagline: form.tagline || undefined,
+  runtime: form.runtime ? Number(form.runtime) : undefined,
+  release_date: form.release_date || undefined,
+  year: form.year ? Number(form.year) || undefined : undefined,
+  imdb_rating: form.imdb_rating ? Number(form.imdb_rating) : undefined,
+  imdb_votes: form.imdb_votes ? Number(form.imdb_votes) : undefined,
+  certification: form.certification || undefined,
+  tmdb_id: form.tmdb_id ? Number(form.tmdb_id) : undefined,
+  country: form.country || undefined,
+  origin_country: form.origin_country || undefined,
+  language: form.language || undefined,
+  poster_path: form.poster_path,
+  backdrop_path: form.backdrop_path,
+  tags: form.tags,
+  people: buildPeople(),
+  type: form.type,
+  is_pinned: form.is_pinned,
+  is_available: form.is_available,
+  sort_order: form.sort_order ? Number(form.sort_order) : undefined,
+ 
+  trailer_url: form.trailer_url || undefined,
+  logo_url: form.logo_url || undefined,
+};
 
     setSaving(true);
     try {
@@ -333,7 +389,13 @@ function ItemManagementForm({
       setSaving(false);
     }
   };
-
+/**
+ * تحميل الصورة من الرابط المدخل في حقل النص (poster_path أو backdrop_path)
+ * وتخزينها في التخزين المحلي وفقاً لإعداد storageMode.
+ *
+ * @param type - نوع الصورة: "poster" أو "backdrop".
+ * @returns void (تعرض رسائل نجاح/فشل عبر toast).
+ */
   /** تنزيل الصورة من الرابط الحالي إلى التخزين المحلي. */
   const handleDownloadImage = async (type: "poster" | "backdrop") => {
     const url = type === "poster" ? form.poster_path : form.backdrop_path;
@@ -347,6 +409,7 @@ function ItemManagementForm({
         mediaId: item.media_id,
         imageUrl: url,
         type,
+         storageMode, // ← تمرير القيمة من الإعدادات
       });
       setForm((prev) => ({
         ...prev,
@@ -550,16 +613,7 @@ function ItemManagementForm({
                     />
                   </div>
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <ChipInputField
-                      label="الكتّاب"
-                      items={form.writers}
-                      inputValue={chipInputs.writers}
-                      onInputChange={(value) =>
-                        setChipInputs((prev) => ({ ...prev, writers: value }))
-                      }
-                      onAdd={() => handleChipAdd("writers")}
-                      onDelete={(value) => handleChipDelete("writers", value)}
-                    />
+              
                     <ChipInputField
                       label="التصنيفات"
                       items={form.tags}
