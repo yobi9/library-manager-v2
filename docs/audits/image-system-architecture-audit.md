@@ -479,7 +479,7 @@ The project uses a Windows-native deployment model:
 | D2 | Scanner stores absolute paths; enrichment stores relative paths | DB schema | Fragile `resolveImagePath()`, hard to migrate |
 | D3 | `w=` and `h=` query params completely ignored | `image-service.ts` | No server-side resizing, wasted bandwidth |
 | D4 | No `sharp` or image processing library | `package.json` | Cannot resize, compress, or convert images |
-| D5 | `storage_mode: "s3"` in settings but no S3 implementation | `tmdb-enrichment-service.ts:463` | Setting is misleading, S3 never works |
+| D5 | `storage_mode: media_folder` in settings but no S3 implementation | `tmdb-enrichment-service.ts:463` | Setting is misleading, S3 never works |
 | D6 | 5 dead columns in `media_items` (logo_url, clearart_url, thumb_url, etc.) | `schema.ts:94-100,117` | Schema bloat, confusion |
 
 ### 9.3 Production Risks

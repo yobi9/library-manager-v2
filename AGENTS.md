@@ -115,29 +115,7 @@ TSDoc is part of the code. Every newly created or modified function must have co
 
 
 
-## Project structure
 
-```
-src/
-├── app/           # App Router: (viewer)/, (admin)/, (auth)/, api/ (19 route groups)
-│   └── page.tsx   # ONE file per route — no page-wrapper/page-client (flat pattern)
-├── backend/       # Clean Architecture: Controllers → Services → Repositories → DB
-│   ├── controllers/ (20 files, singletons via getControllers())
-│   ├── services/ (20+ files, singletons via getServices())
-│   ├── repositories/ (24 files)
-│   ├── db/        # db.ts (WAL+retry), schema.ts (23 tables), migrations/
-│   ├── api/       # route-helpers.ts (buildContext, toNextResponse, requireAuth)
-│   ├── middleware/ # rate-limiter, maintenance, visitor-tracking
-│   └── scanner/   # ScanOrchestrator, LibraryMonitor, etc. (13 files)
-├── features/      # Feature modules (owned by features, not routes)
-│   ├── viewer/pages/  # lib-items, item-detail, live-stream, people, person-detail, player, watch-later, years
-│   │   └── home/      # hero, pinned-slider, favorites-slider, TypeSectionSlider
-│   └── auth/pages/    # login-page
-├── shared/        # components/ui/ (16), components/layout/, constants/, hooks/, types/, utils/
-├── lib/           # config/env.ts (Zod-validated), frontend/, utils.ts
-├── providers/     # QueryClientProvider + AuthProvider + ThemeProvider (next-themes) + Toaster (Sonner)
-└── public/        # Uploaded images (src/public/assets/...)
-```
 
 ## Key conventions
 

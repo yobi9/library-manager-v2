@@ -33,7 +33,7 @@
 ### Non-Goals (Out of Scope)
 
 - Server-side image resizing (requires `sharp` — separate effort)
-- S3 storage implementation (separate project)
+- media_folder storage implementation (separate project)
 - Image compression or format conversion
 - CDN integration
 
