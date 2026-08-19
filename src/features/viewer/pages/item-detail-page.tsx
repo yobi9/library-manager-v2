@@ -209,127 +209,126 @@ export default function ItemDetailPage() {
   const libraryId = media.library_id ?? media.libraryId ?? media.parent_id;
 
   return (
-    <div className="relative min-h-screen w-full">
-      {backdropUrl && (
-        <div className="pointer-events-none absolute inset-0 z-0">
-          <img src={backdropUrl} alt="" className="h-full w-full object-cover opacity-40" />
-          <div className="from-background/40 via-background/70 to-background absolute inset-0 bg-linear-to-b" />
-        </div>
-      )}
-
-      <div className="relative z-10 container mx-auto px-3 py-4 sm:px-4 sm:py-6 md:px-6 md:py-8 lg:px-8">
-        <Breadcrumbs
-          items={[
-            ...(libraryName && libraryId
-              ? [{ label: libraryName, href: `/items/${libraryId}` }]
-              : [{ label: "الرئيسية", href: ROUTES.HOME }]),
-            { label: title },
-          ]}
-        />
-
-        <div className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-[auto_1fr] md:gap-8 lg:gap-12">
-          <div className="mx-auto w-50 shrink-0 md:mx-0 md:w-65 lg:w-75">
-            <div className="relative aspect-2/3 overflow-hidden rounded-2xl">
-              {posterUrl ? (
-                <img
-                  src={posterUrl}
-                  alt={title}
-                  className="h-full w-full object-cover"
-                  loading="eager"
-                />
-              ) : (
-                <div className="bg-muted text-muted-foreground flex h-full w-full items-center justify-center text-4xl font-bold">
-                  {title[0]}
-                </div>
-              )}
-            </div>
+    <div className="relative w-full">
+      {/* منطقة البطل: الخلفية + الملصق + العنوان + الأزرار */}
+      <div className="relative">
+        {backdropUrl && (
+          <div className="pointer-events-none absolute inset-0 z-0">
+            <img src={backdropUrl} alt="" className="h-full w-full object-cover opacity-40" />
+            <div className="from-background/40 via-background/70 to-background absolute inset-0 bg-linear-to-b" />
           </div>
+        )}
 
-          <div className="flex flex-col gap-3 text-center md:text-start">
-            {/* المنطقة 1: العنوان والتصنيفات */}
-            <div className="flex flex-col gap-3">
-              <h1 className="text-2xl font-bold sm:text-3xl lg:text-4xl">{title}</h1>
+        <div className="relative z-10 container mx-auto px-3 pt-4 sm:px-4 sm:pt-6 md:px-6 md:pt-8 lg:px-8">
+          <Breadcrumbs
+            items={[
+              ...(libraryName && libraryId
+                ? [{ label: libraryName, href: `/items/${libraryId}` }]
+                : [{ label: "الرئيسية", href: ROUTES.HOME }]),
+              { label: title },
+            ]}
+          />
 
-              <div className="flex flex-wrap justify-center gap-1.5 md:justify-start">
-                <Badge variant="default">{media.type}</Badge>
-                {year && (
-                  <Link href={ROUTES.YEAR_ITEMS(String(year)) as import("next").Route}>
-                    <Badge variant="secondary" className="hover:bg-secondary/80 cursor-pointer">
-                      {year}
-                    </Badge>
-                  </Link>
+          <div className="mt-6 grid grid-cols-1 gap-6 pb-6 md:grid-cols-[auto_1fr] md:gap-8 lg:gap-12">
+            <div className="mx-auto w-50 shrink-0 md:mx-0 md:w-65 lg:w-75">
+              <div className="relative aspect-2/3 overflow-hidden rounded-2xl">
+                {posterUrl ? (
+                  <img
+                    src={posterUrl}
+                    alt={title}
+                    className="h-full w-full object-cover"
+                    loading="eager"
+                  />
+                ) : (
+                  <div className="bg-muted text-muted-foreground flex h-full w-full items-center justify-center text-4xl font-bold">
+                    {title[0]}
+                  </div>
                 )}
-                {(() => {
-                  const ca = media.created_at ?? media.createdAt;
-                  if (ca) {
-                    const daysDiff = (now - new Date(ca).getTime()) / (1000 * 3600 * 24);
-                    if (daysDiff <= 7)
-                      return (
-                        <Link href="/new">
-                          <Badge variant="secondary" className="animate-pulse">
-                            جديد
-                          </Badge>
-                        </Link>
-                      );
-                  }
-                  return null;
-                })()}
-                {media.certification && (
-                  <Badge
-                    variant="destructive"
-                    className="hover:bg-destructive/80 cursor-pointer"
-                    onClick={() =>
-                      router.push(
-                        `/certification/${encodeURIComponent(String(media.certification))}` as import("next").Route,
-                      )
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-3 text-center md:text-start">
+              <div className="flex flex-col gap-3">
+                <h1 className="text-2xl font-bold sm:text-3xl lg:text-4xl">{title}</h1>
+
+                <div className="flex flex-wrap justify-center gap-1.5 md:justify-start">
+                  <Badge variant="default">{media.type}</Badge>
+                  {year && (
+                    <Link href={ROUTES.YEAR_ITEMS(String(year)) as import("next").Route}>
+                      <Badge variant="secondary" className="hover:bg-secondary/80 cursor-pointer">
+                        {year}
+                      </Badge>
+                    </Link>
+                  )}
+                  {(() => {
+                    const ca = media.created_at ?? media.createdAt;
+                    if (ca) {
+                      const daysDiff = (now - new Date(ca).getTime()) / (1000 * 3600 * 24);
+                      if (daysDiff <= 7)
+                        return (
+                          <Link href="/new">
+                            <Badge variant="secondary" className="animate-pulse">
+                              جديد
+                            </Badge>
+                          </Link>
+                        );
                     }
-                  >
-                    {media.certification}
-                  </Badge>
-                )}
-                {rating > 0 && (
-                  <Badge variant="default" className="bg-rating-star/20 text-rating-star">
-                    ★ {Number(rating).toFixed(1)}
-                    {Number(media.imdb_votes) > 0 && (
-                      <span className="ms-1 text-xs opacity-70">
-                        ({Number(media.imdb_votes).toLocaleString()})
-                      </span>
-                    )}
-                  </Badge>
-                )}
-                {(media.duration ?? media.runtime) && (
-                  <Badge variant="secondary">{media.duration ?? media.runtime} دقيقة</Badge>
-                )}
-                {isCollection && seasonsCount > 0 && (
-                  <Badge variant="secondary">
-                    {seasonsCount === 1 ? `${seasonsCount} موسم` : `${seasonsCount} مواسم`}
-                  </Badge>
-                )}
-                {isCollection && episodesCount > 0 && (
-                  <Badge variant="secondary">
-                    {episodesCount === 1 ? `${episodesCount} حلقة` : `${episodesCount} حلقات`}
-                  </Badge>
+                    return null;
+                  })()}
+                  {media.certification && (
+                    <Badge
+                      variant="destructive"
+                      className="hover:bg-destructive/80 cursor-pointer"
+                      onClick={() =>
+                        router.push(
+                          `/certification/${encodeURIComponent(String(media.certification))}` as import("next").Route,
+                        )
+                      }
+                    >
+                      {media.certification}
+                    </Badge>
+                  )}
+                  {rating > 0 && (
+                    <Badge variant="default" className="bg-rating-star/20 text-rating-star">
+                      ★ {Number(rating).toFixed(1)}
+                      {Number(media.imdb_votes) > 0 && (
+                        <span className="ms-1 text-xs opacity-70">
+                          ({Number(media.imdb_votes).toLocaleString()})
+                        </span>
+                      )}
+                    </Badge>
+                  )}
+                  {(media.duration ?? media.runtime) && (
+                    <Badge variant="secondary">{media.duration ?? media.runtime} دقيقة</Badge>
+                  )}
+                  {isCollection && seasonsCount > 0 && (
+                    <Badge variant="secondary">
+                      {seasonsCount === 1 ? `${seasonsCount} موسم` : `${seasonsCount} مواسم`}
+                    </Badge>
+                  )}
+                  {isCollection && episodesCount > 0 && (
+                    <Badge variant="secondary">
+                      {episodesCount === 1 ? `${episodesCount} حلقة` : `${episodesCount} حلقات`}
+                    </Badge>
+                  )}
+                </div>
+
+                {genres.length > 0 && (
+                  <div className="flex flex-wrap justify-center gap-1.5 md:justify-start">
+                    {genres.map((g) => (
+                      <Link
+                        key={g}
+                        href={ROUTES.GENRE_ITEMS(g.replace(/\s+/g, "_")) as import("next").Route}
+                      >
+                        <Badge variant="outline" className="hover:bg-accent cursor-pointer">
+                          {g}
+                        </Badge>
+                      </Link>
+                    ))}
+                  </div>
                 )}
               </div>
 
-              {genres.length > 0 && (
-                <div className="flex flex-wrap justify-center gap-1.5 md:justify-start">
-                  {genres.map((g) => (
-                    <Link
-                      key={g}
-                      href={ROUTES.GENRE_ITEMS(g.replace(/\s+/g, "_")) as import("next").Route}
-                    >
-                      <Badge variant="outline" className="hover:bg-accent cursor-pointer">
-                        {g}
-                      </Badge>
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* المنطقة 2: القصة والإجراءات */}
-            <div className="border-border/50 mt-4 border-t pt-5">
               {overview && (
                 <div className="max-w-2xl">
                   <p
@@ -356,7 +355,7 @@ export default function ItemDetailPage() {
                 </div>
               )}
 
-              <div className="mt-4 flex justify-center md:justify-start">
+              <div className="mt-2 flex justify-center md:justify-start">
                 <MediaActions
                   mediaId={mediaId}
                   title={title}
@@ -365,131 +364,125 @@ export default function ItemDetailPage() {
                 />
               </div>
             </div>
-
-            {/* المنطقة 3: طاقم التمثيل */}
-            {media.cast && media.cast.length > 0 && (
-              <div className="border-border/50 mt-4 border-t pt-5">
-                <div className="mb-3 flex items-center justify-between gap-2">
-                  <h2 className="text-xl font-bold">
-                    طاقم التمثيل
-                    <span className="text-muted-foreground ms-2 text-sm font-medium">
-                      ({media.cast.length})
-                    </span>
-                  </h2>
-                  {media.cast.length > CAST_DEFAULT_COUNT && (
-                    <ExpandToggle
-                      expanded={castExpanded}
-                      onClick={() => setCastExpanded((v) => !v)}
-                    />
-                  )}
-                </div>
-                <div className="flex flex-wrap justify-center gap-x-2 gap-y-5 md:justify-start">
-                  {(castExpanded ? media.cast : media.cast.slice(0, CAST_DEFAULT_COUNT)).map(
-                    (member, idx) => (
-                      <CastMemberCard key={`${String(member.person_id)}-${idx}`} member={member} />
-                    ),
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* المنطقة 4: طاقم العمل (الأساسي فقط) */}
-            {media.crew && media.crew.length > 0 && (
-              <div className="border-border/50 mt-4 border-t pt-5">
-                <div className="mb-3 flex items-center justify-between gap-2">
-                  <h2 className="text-xl font-bold">
-                    طاقم العمل
-                    <span className="text-muted-foreground ms-2 text-sm font-medium">
-                      ({media.crew.length})
-                    </span>
-                  </h2>
-                  {media.crew.length > CREW_DEFAULT_COUNT && (
-                    <ExpandToggle
-                      expanded={crewExpanded}
-                      onClick={() => setCrewExpanded((v) => !v)}
-                    />
-                  )}
-                </div>
-                <div className="flex flex-wrap justify-center gap-x-2 gap-y-5 md:justify-start">
-                  {(crewExpanded
-                    ? media.crew
-                    : getUniqueCrewByRole(media.crew ?? []).slice(0, CREW_DEFAULT_COUNT)
-                  ).map((member, idx) => (
-                    <CrewMemberCard key={`${String(member.person_id)}-${idx}`} member={member} />
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
         </div>
+      </div>
 
-        {isSeries && seasons.length > 0 && (
-          <section className="mt-8">
-            <SectionHeader
-              title={`المواسم (${seasonsCount || seasons.length})`}
-              count={seasonsCount || seasons.length}
-              variant="lined"
-              className="mb-4"
-            />
-
-            {/* <div className="flex gap-3 overflow-x-auto pb-2 -mx-3 sm:-mx-4 md:-mx-6 lg:-mx-8 px-3 sm:px-4 md:px-6  "> */}
-            {/* الهوامش السالبة هنا تضمن أن السلايدر يملأ الشاشة كاملة */}
-            <div className="-mx-3 flex gap-3  px-3 pb-2 sm:-mx-4 sm:px-4 md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
-              {seasons.map((season) => {
-                const seasonId = season.media_id ?? season.id ?? 0;
-                return (
-                  <div key={String(seasonId)} className="w-36 shrink-0 sm:w-40">
-                      <UnifiedCard
-                      id={String(seasonId)}
-                      title={season.title ?? "الموسم"}
-                      imageUrl={
-                        Number(seasonId)
-                          ? `/api/images/${seasonId}?type=poster&w=300&h=450`
-                          : undefined
-                      }
-                      year={season.year ?? ""}
-                     
-                      isNew={isItemNew(season.created_at ?? season.createdAt)}
-                     
-                      isSelected={selectedSeasonId === seasonId}
-                       iconVariant="link"
-                      onClick={() => handleSeasonClick(seasonId)}
-                    /> 
- 
-
-                  </div>
-                );
-              })}
+      {/* منطقة المحتوى: طاقم التمثيل + العمل + المواسم + الحلقات + التوصيات */}
+      <div className="bg-background relative z-10">
+        <div className="container mx-auto px-3 py-6 sm:px-4 sm:py-8 md:px-6 md:py-10 lg:px-8">
+          {media.cast && media.cast.length > 0 && (
+            <div className="border-border/50 border-t pt-5">
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <h2 className="text-xl font-bold">
+                  طاقم التمثيل
+                  <span className="text-muted-foreground ms-2 text-sm font-medium">
+                    ({media.cast.length})
+                  </span>
+                </h2>
+                {media.cast.length > CAST_DEFAULT_COUNT && (
+                  <ExpandToggle
+                    expanded={castExpanded}
+                    onClick={() => setCastExpanded((v) => !v)}
+                  />
+                )}
+              </div>
+              <div className="flex flex-wrap justify-center gap-x-2 gap-y-5 md:justify-start">
+                {(castExpanded ? media.cast : media.cast.slice(0, CAST_DEFAULT_COUNT)).map(
+                  (member, idx) => (
+                    <CastMemberCard key={`${String(member.person_id)}-${idx}`} member={member} />
+                  ),
+                )}
+              </div>
             </div>
-          </section>
-        )}
+          )}
 
-        <div className="mt-8">
-          <SeasonEpisodesSection
-            selectedSeasonId={selectedSeasonId}
-            episodesSectionRef={episodesSectionRef}
-          />
+          {media.crew && media.crew.length > 0 && (
+            <div className="border-border/50 mt-6 border-t pt-5">
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <h2 className="text-xl font-bold">
+                  طاقم العمل
+                  <span className="text-muted-foreground ms-2 text-sm font-medium">
+                    ({media.crew.length})
+                  </span>
+                </h2>
+                {media.crew.length > CREW_DEFAULT_COUNT && (
+                  <ExpandToggle
+                    expanded={crewExpanded}
+                    onClick={() => setCrewExpanded((v) => !v)}
+                  />
+                )}
+              </div>
+              <div className="flex flex-wrap justify-center gap-x-2 gap-y-5 md:justify-start">
+                {(crewExpanded
+                  ? media.crew
+                  : getUniqueCrewByRole(media.crew ?? []).slice(0, CREW_DEFAULT_COUNT)
+                ).map((member, idx) => (
+                  <CrewMemberCard key={`${String(member.person_id)}-${idx}`} member={member} />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {isSeries && seasons.length > 0 && (
+            <section className="mt-8">
+              <SectionHeader
+                title={`المواسم (${seasonsCount || seasons.length})`}
+                count={seasonsCount || seasons.length}
+                variant="lined"
+                className="mb-4"
+              />
+              <div className="-mx-3 flex gap-3 px-3 pb-2 sm:-mx-4 sm:px-4 md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
+                {seasons.map((season) => {
+                  const seasonId = season.media_id ?? season.id ?? 0;
+                  return (
+                    <div key={String(seasonId)} className="w-36 shrink-0 sm:w-40">
+                      <UnifiedCard
+                        id={String(seasonId)}
+                        title={season.title ?? "الموسم"}
+                        imageUrl={
+                          Number(seasonId)
+                            ? `/api/images/${seasonId}?type=poster&w=300&h=450`
+                            : undefined
+                        }
+                        year={season.year ?? ""}
+                        isNew={isItemNew(season.created_at ?? season.createdAt)}
+                        isSelected={selectedSeasonId === seasonId}
+                        iconVariant="link"
+                        onClick={() => handleSeasonClick(seasonId)}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          )}
+
+          <div className="mt-8">
+            <SeasonEpisodesSection
+              selectedSeasonId={selectedSeasonId}
+              episodesSectionRef={episodesSectionRef}
+            />
+          </div>
+
+          {(recsLoading || recommendations.length > 0) && (
+            <section className="mt-8 space-y-4">
+              <SectionHeader
+                variant="default"
+                title={isSeries ? "مسلسلات قد تعجبك" : "أفلام قد تعجبك"}
+                count={recommendations.length}
+                className="mb-4"
+              />
+              <UnifiedMedia
+                mode="slider"
+                isLoading={recsLoading}
+                skeletonCount={10}
+                items={recommendations.slice(0, 20)}
+                mapItemToProps={mapMediaToCard}
+              />
+            </section>
+          )}
         </div>
-
-        {(recsLoading || recommendations.length > 0) && (
-          <section className="mt-8 space-y-4">
-            <SectionHeader
-              variant="default"
-              title={isSeries ? "مسلسلات قد تعجبك" : "أفلام قد تعجبك"}
-              count={recommendations.length}
-              className="mb-4"
-            />
-            <UnifiedMedia
-              mode="slider"
-                 
-              isLoading={recsLoading}
-              skeletonCount={10}
-              items={recommendations.slice(0, 20)}
-              mapItemToProps={mapMediaToCard}
-             
-            />
-          </section>
-        )}
       </div>
     </div>
   );
