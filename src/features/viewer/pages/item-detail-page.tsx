@@ -248,7 +248,7 @@ export default function ItemDetailPage() {
           <div className="flex flex-col gap-3 text-center md:text-start">
             {/* المنطقة 1: العنوان والتصنيفات */}
             <div className="flex flex-col gap-3">
-              <h1 className="text-base font-bold sm:text-lg md:text-xl lg:text-2xl">{title}</h1>
+              <h1 className="text-2xl font-bold sm:text-3xl lg:text-4xl">{title}</h1>
 
               <div className="flex flex-wrap justify-center gap-1.5 md:justify-start">
                 <Badge variant="default">{media.type}</Badge>
@@ -370,9 +370,9 @@ export default function ItemDetailPage() {
             {media.cast && media.cast.length > 0 && (
               <div className="border-border/50 mt-4 border-t pt-5">
                 <div className="mb-3 flex items-center justify-between gap-2">
-                  <h2 className="text-base font-bold">
+                  <h2 className="text-xl font-bold">
                     طاقم التمثيل
-                    <span className="text-muted-foreground ms-2 text-sm font-light">
+                    <span className="text-muted-foreground ms-2 text-sm font-medium">
                       ({media.cast.length})
                     </span>
                   </h2>
@@ -397,9 +397,9 @@ export default function ItemDetailPage() {
             {media.crew && media.crew.length > 0 && (
               <div className="border-border/50 mt-4 border-t pt-5">
                 <div className="mb-3 flex items-center justify-between gap-2">
-                  <h2 className="text-base font-bold">
+                  <h2 className="text-xl font-bold">
                     طاقم العمل
-                    <span className="text-muted-foreground ms-2 text-sm font-light">
+                    <span className="text-muted-foreground ms-2 text-sm font-medium">
                       ({media.crew.length})
                     </span>
                   </h2>
