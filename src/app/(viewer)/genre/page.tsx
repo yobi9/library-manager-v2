@@ -38,7 +38,7 @@ export default function GenrePage() {
             <Link
               key={genre.name}
               href={ROUTES.GENRE_ITEMS(genre.name.replace(/\s+/g, "_")) as import("next").Route}
-              className="group border-border bg-card/50 hover:border-primary/40 hover:bg-card flex flex-col items-center justify-center gap-2 rounded-xl border p-6 text-center transition-all hover:shadow-lg"
+              className="group border-border bg-card/60 shadow-card hover:border-primary/40 hover:bg-card hover:shadow-hover flex flex-col items-center justify-center gap-2 rounded-xl border p-6 text-center transition-all duration-300"
             >
               <span className="group-hover:text-primary text-sm font-bold transition-colors sm:text-base">
                 {genre.name}

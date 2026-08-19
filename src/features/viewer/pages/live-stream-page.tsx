@@ -21,7 +21,7 @@ function ChannelCard({ channel }: { channel: LiveChannel }) {
   const showImage = channel.image !== null && !imageError;
 
   return (
-    <Card className="group border-border/50 bg-card/50 hover:border-primary/30 flex flex-col overflow-hidden transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
+    <Card className="group border-border/50 bg-card/60 shadow-card hover:border-primary/30 hover:shadow-hover flex flex-col overflow-hidden transition-all duration-300 hover:-translate-y-0.5">
       <div className="bg-muted relative aspect-video overflow-hidden">
         {showImage ? (
           // eslint-disable-next-line @next/next/no-img-element -- upstream images are remote and unknown at build time

@@ -38,7 +38,7 @@ export default function CertificationsPage() {
             <Link
               key={cert.name}
               href={ROUTES.CERTIFICATION_ITEMS(cert.name) as import("next").Route}
-              className="group border-border bg-card/50 hover:border-primary/40 hover:bg-card flex flex-col items-center gap-2 rounded-xl border p-4 text-center transition-all hover:shadow-lg"
+              className="group border-border bg-card/60 shadow-card hover:border-primary/40 hover:bg-card hover:shadow-hover flex flex-col items-center gap-2 rounded-xl border p-4 text-center transition-all duration-300"
             >
               <BadgeCheck className="text-primary h-6 w-6" />
               <span className="text-lg font-bold">{cert.name}</span>

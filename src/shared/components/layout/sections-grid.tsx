@@ -96,7 +96,7 @@ function SectionCard({ section }: SectionCardProps) {
   return (
     <a
       href={buildSectionLink(section)}
-      className="group border-border bg-card/50 hover:border-primary/40 relative overflow-hidden rounded-lg border transition-all hover:shadow-lg"
+      className="group border-border bg-card/60 shadow-card hover:border-primary/40 hover:shadow-hover relative overflow-hidden rounded-lg border transition-all duration-300"
     >
       <div className="bg-muted/50 relative aspect-2/3 overflow-hidden rounded-lg">
         <img

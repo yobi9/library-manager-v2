@@ -31,7 +31,7 @@ export function EpisodeCard({
 
   return (
     <div
-      className={`group border-border bg-card hover:border-primary/20 relative flex cursor-pointer flex-col overflow-hidden rounded-xl border transition-all duration-300 hover:shadow-lg ${
+      className={`group border-border bg-card shadow-card hover:border-primary/30 hover:shadow-hover relative flex cursor-pointer flex-col overflow-hidden rounded-xl border transition-all duration-300 ${
         isActive ? "ring-primary/40 shadow-lg ring-1" : ""
       }`}
       onClick={onClick}

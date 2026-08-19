@@ -48,7 +48,7 @@ export default function YearsPage() {
       <div className="grid grid-cols-3 gap-4 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8">
         {years.map((year) => (
           <Link key={year} href={ROUTES.YEAR_ITEMS(String(year)) as import("next").Route}
-            className="group flex flex-col items-center justify-center gap-1.5 rounded-xl border border-border bg-card/50 p-4 text-center transition-all hover:border-primary/40 hover:bg-card hover:shadow-lg">
+            className="group flex flex-col items-center justify-center gap-1.5 rounded-xl border border-border bg-card/60 p-4 text-center transition-all duration-300 hover:border-primary/40 hover:bg-card hover:shadow-hover shadow-card">
             <Calendar className="h-5 w-5 text-muted-foreground transition-colors group-hover:text-primary" />
             <span className="text-sm font-bold transition-colors group-hover:text-primary sm:text-base">{year}</span>
           </Link>

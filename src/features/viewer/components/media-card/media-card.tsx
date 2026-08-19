@@ -68,7 +68,7 @@ export function MediaCard({
         className,
       )}
     >
-      <div className="bg-muted relative aspect-2/3 overflow-hidden rounded-lg">
+      <div className="bg-muted border-border/60 shadow-card group-hover:border-primary/40 group-hover:shadow-hover relative aspect-2/3 overflow-hidden rounded-lg border transition-all duration-300">
         {resolvedPosterUrl ? (
           <img
             src={resolvedPosterUrl}

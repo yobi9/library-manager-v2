@@ -48,7 +48,13 @@ export function HomeHero({ settings }: { settings: PublicSettings }) {
   if (!current) {
     return (
       <section className="bg-background relative flex h-[60vh] min-h-100 items-center justify-center overflow-hidden">
-        <div className="text-center">
+        <img
+          src="/assets/images/bg.png"
+          alt=""
+          className="absolute inset-0 h-full w-full object-cover opacity-30"
+        />
+        <div className="absolute inset-0 bg-linear-to-t from-black/70 via-black/40 to-transparent" />
+        <div className="relative z-10 text-center">
           <h1 className="text-foreground mb-4 text-3xl font-bold md:text-5xl">
             {settings.site_title ?? APP_NAME}
           </h1>
@@ -80,8 +86,14 @@ export function HomeHero({ settings }: { settings: PublicSettings }) {
         if (e.key === "ArrowLeft") goTo((displayIdx + 1) % exclusiveItems.length);
       }}
     >
+      <img
+        src="/assets/images/bg.png"
+        alt=""
+        className="absolute inset-0 z-0 h-full w-full object-cover opacity-30"
+      />
+
       {backdropUrl && (
-        <div key={String(mediaId)} className="absolute inset-0 transition-opacity duration-1000">
+        <div key={String(mediaId)} className="absolute inset-0 z-10 transition-opacity duration-1000">
           <img src={backdropUrl} alt="" className="h-full w-full object-cover opacity-60" />
           <div className="absolute inset-0 bg-linear-to-t from-black/90 via-black/50 to-transparent" />
           <div className="absolute inset-0 bg-linear-to-r from-black/60 to-transparent" />
@@ -148,7 +160,7 @@ export function HomeHero({ settings }: { settings: PublicSettings }) {
           <div className="flex flex-wrap gap-4">
             <Link
               href={href as import("next").Route}
-              className="flex items-center gap-2 rounded-full bg-white px-8 py-3 text-sm font-medium text-black shadow-lg transition-all hover:scale-105 hover:bg-white/90 active:scale-95"
+              className="bg-primary text-primary-foreground flex items-center gap-2 rounded-full px-8 py-3 text-sm font-bold shadow-lg transition-all hover:bg-primary/90 hover:scale-105 active:scale-95"
             >
               <Play size={18} />
               شاهد الآن
@@ -190,7 +202,7 @@ export function HomeHero({ settings }: { settings: PublicSettings }) {
         </div>
       )}
 
-      <div className="pointer-events-none absolute right-0 bottom-0 left-0 h-40 bg-linear-to-t from-black/70 to-transparent" />
+      <div className="pointer-events-none absolute right-0 bottom-0 left-0 h-40 bg-linear-to-t from-background to-transparent" />
     </section>
   );
 }

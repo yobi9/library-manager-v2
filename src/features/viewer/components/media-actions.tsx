@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { ROUTES } from "@/shared/constants";
 import { useFavoritesContext } from "@/lib/frontend/favorites-context";
 import { useWatchLater } from "@/lib/frontend/use-watch-later";
-import { useOpenFolder } from "@/features/viewer/hooks/use-open-folder";
+import { useOpenFolder } from "@/lib/frontend/hooks/use-open-folder";
  
 
 interface MediaActionsProps {
@@ -62,8 +62,8 @@ export function MediaActions({ mediaId, title, type, folderPath }: MediaActionsP
         }}
         className={`flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm transition-all active:scale-95 ${
           favorite
-            ? "border-primary/40 bg-primary/10 text-primary"
-            : "border-border text-muted-foreground hover:border-primary/40 hover:text-primary"
+            ? "border-primary/40 bg-primary/10 text-primary shadow-sm"
+            : "border-border/80 bg-card/50 text-muted-foreground shadow-sm hover:border-primary/40 hover:text-primary hover:shadow-md"
         }`}
       >
         <Heart size={16} fill={favorite ? "currentColor" : "none"} />
@@ -78,8 +78,8 @@ export function MediaActions({ mediaId, title, type, folderPath }: MediaActionsP
         }}
         className={`flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm transition-all active:scale-95 ${
           watchLater
-            ? "border-primary/40 bg-primary/10 text-primary"
-            : "border-border text-muted-foreground hover:border-primary/40 hover:text-primary"
+            ? "border-primary/40 bg-primary/10 text-primary shadow-sm"
+            : "border-border/80 bg-card/50 text-muted-foreground shadow-sm hover:border-primary/40 hover:text-primary hover:shadow-md"
         }`}
       >
         <Bookmark size={16} fill={watchLater ? "currentColor" : "none"} />
@@ -91,7 +91,7 @@ export function MediaActions({ mediaId, title, type, folderPath }: MediaActionsP
         <button
           onClick={handleOpenFolder}
           disabled={isOpening}
-          className="text-muted-foreground hover:border-primary/40 hover:text-primary flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+          className="border-border/80 bg-card/50 text-muted-foreground shadow-sm hover:border-primary/40 hover:text-primary hover:shadow-md flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {isOpening ? <Loader2 size={16} className="animate-spin" /> : <FolderOpen size={16} />}
           فتح المجلد

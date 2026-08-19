@@ -59,7 +59,7 @@ export default function PeopleDirectoryPage() {
             <Link
               key={person.id}
               href={ROUTES.PERSON_ITEMS(String(person.id)) as import("next").Route}
-              className="group border-border bg-card/50 hover:border-primary/40 hover:bg-card flex flex-col items-center gap-2 rounded-lg border p-4 transition-all hover:shadow-lg"
+              className="group border-border bg-card/60 shadow-card hover:border-primary/40 hover:bg-card hover:shadow-hover flex flex-col items-center gap-2 rounded-lg border p-4 transition-all duration-300"
             >
               <div className="border-border bg-muted group-hover:border-primary/50 h-24 w-24 overflow-hidden rounded-full border-2 transition-colors">
                 {person.profile_path ? (

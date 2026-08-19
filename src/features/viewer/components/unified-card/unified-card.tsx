@@ -95,11 +95,11 @@ export function UnifiedCard({
   const cardContent = (
     <>
       {imageUrl ? (
-        <div className="bg-muted relative aspect-2/3 overflow-hidden rounded-lg">
+        <div className="bg-muted border-border/60 shadow-card group-hover:border-primary/40 group-hover:shadow-hover relative aspect-2/3 overflow-hidden rounded-lg border transition-all duration-300">
           <img
             src={imageUrl}
             alt={title}
-            className="h-full w-full object-cover transition-transform group-hover:scale-110"
+            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-110"
             loading={priority ? "eager" : "lazy"}
           />
 
@@ -174,7 +174,7 @@ export function UnifiedCard({
           </div>
         </div>
       ) : (
-        <div className="from-card to-card/50 group-hover:border-primary/50 relative flex aspect-2/3 flex-col items-center justify-center gap-1.5 overflow-hidden rounded-lg border border-transparent bg-linear-to-br transition-all duration-300 sm:gap-2">
+        <div className="from-card to-card/50 group-hover:border-primary/50 border-border/60 shadow-card group-hover:shadow-hover relative flex aspect-2/3 flex-col items-center justify-center gap-1.5 overflow-hidden rounded-lg border bg-linear-to-br transition-all duration-300 sm:gap-2">
           <div
             className="bg-primary/20 border-primary/40 flex h-10 w-10 items-center justify-center rounded-xl border transition-all duration-300 sm:h-12 sm:w-12"
             role="button"
@@ -224,7 +224,7 @@ export function UnifiedCard({
   );
 
 const cardClasses = cn(
-  "bg-transparent border border-transparent rounded-lg transition-all duration-300",
+  "bg-transparent border border-transparent rounded-lg transition-all duration-300 overflow-hidden",
   isSelected && "ring-4 ring-ring ring-offset-2 ring-offset-background shadow-lg shadow-ring/25 scale-[1.02]"
 );
   if (resolvedHref) {

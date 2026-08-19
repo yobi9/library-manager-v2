@@ -17,6 +17,7 @@ import { Breadcrumbs } from "@/shared/components/ui/breadcrumbs";
 import { UnifiedMedia } from "@/features/viewer/components/unified-media/unified-media";
 import { UnifiedCard } from "@/features/viewer/components/unified-card/unified-card";
 import { CrewMemberCard } from "@/features/viewer/components/crew-member-card";
+import { CastMemberCard } from "@/features/viewer/components/cast-member-card";
 import { MediaActions } from "@/features/viewer/components/media-actions";
 import { Badge } from "@/shared/components/ui/badge";
 import { AlertCircle, ChevronDown, ChevronUp } from "lucide-react";
@@ -25,8 +26,6 @@ import { CAST_DEFAULT_COUNT, CREW_DEFAULT_COUNT } from "@/shared/constants/crew-
 import { toast } from "sonner";
 import { getUniqueCrewByRole } from "@/shared/utils/crew-helpers";
 import { SectionHeader } from "@/features/viewer/components/section-header";
-
-type CastMember = NonNullable<MediaItem["cast"]>[number];
 
 /**
  * زر «عرض الكل / إخفاء» لأقسام الممثلين وطاقم العمل.
@@ -47,76 +46,6 @@ function ExpandToggle({ expanded, onClick }: { expanded: boolean; onClick: () =>
       {expanded ? "إخفاء" : "عرض الكل"}
       {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
     </button>
-  );
-}
-
-/**
- * عنصر عضو طاقم التمثيل في صفحة تفاصيل العنصر.
- *
- * - الهدف: عرض صورة الشخص واسمه ودوره في عنصر مضغوط خالٍ من أي إطار أو
- *   خلفية أو ظل (بلا هوية "بطاقة")، بأسلوب منصات العرض الاحترافية، مع
- *   رابط لصفحة الشخص عند توفر `person_id`.
- * - التعامل مع الصور: عند غياب `profile_path` أو فشل تحميل الصورة يُعرض
- *   الحرف الأول من الاسم بديلاً، لمنع ظهور أيقونات الصور المكسورة.
- * - الحجم: أفاتار موحد 56px يناسب شبكة الأفاتار المضغوطة (بلا شريط تمرير).
- *
- * @param member - بيانات عضو الطاقم القادمة من `MediaItem.cast` (ممثلون فقط).
- * @returns رابط أو حاوية div وفق توفر `person_id`.
- */
-function CastMemberCard({ member }: { member: CastMember }) {
-  const [imgFailed, setImgFailed] = useState(false);
-  const personId = member.person_id;
-  const name = member.display_name ?? member.name ?? "";
-  const character = member.character;
-  const hasPhoto = !!member.profile_path && !imgFailed && personId != null && personId !== "";
-
-  const avatar = (
-    <div className="bg-muted h-14 w-14 shrink-0 overflow-hidden rounded-full transition-opacity group-hover:opacity-80">
-      {hasPhoto ? (
-        <img
-          src={`/api/images/${String(personId)}?type=person&w=192&h=192`}
-          alt={name}
-          className="h-full w-full object-cover"
-          loading="lazy"
-          onError={() => setImgFailed(true)}
-        />
-      ) : (
-        <div className="text-muted-foreground flex h-full w-full items-center justify-center text-base font-bold">
-          {(name || "?")[0]}
-        </div>
-      )}
-    </div>
-  );
-
-  const body = (
-    <>
-      {avatar}
-      {name && (
-        <span className="group-hover:text-primary line-clamp-1 w-full text-center text-xs font-medium transition-colors">
-          {name}
-        </span>
-      )}
-      {character ? (
-        <span className="text-muted-foreground line-clamp-1 w-full text-center text-xs">
-          {character}
-        </span>
-      ) : null}
-    </>
-  );
-
-  const cardClasses = "group flex w-20 max-w-20 shrink-0 flex-col items-center gap-1.5 text-center";
-
-  if (personId == null || personId === "") {
-    return <div className={cardClasses}>{body}</div>;
-  }
-
-  return (
-    <Link
-      href={ROUTES.PERSON_ITEMS(String(personId)) as import("next").Route}
-      className={cardClasses}
-    >
-      {body}
-    </Link>
   );
 }
 
@@ -283,8 +212,8 @@ export default function ItemDetailPage() {
     <div className="relative min-h-screen w-full">
       {backdropUrl && (
         <div className="pointer-events-none absolute inset-0 z-0">
-          <img src={backdropUrl} alt="" className="h-full w-full object-cover opacity-30" />
-          <div className="from-background/60 via-background/80 to-background absolute inset-0 bg-linear-to-b" />
+          <img src={backdropUrl} alt="" className="h-full w-full object-cover opacity-40" />
+          <div className="from-background/40 via-background/70 to-background absolute inset-0 bg-linear-to-b" />
         </div>
       )}
 
@@ -319,7 +248,7 @@ export default function ItemDetailPage() {
           <div className="flex flex-col gap-3 text-center md:text-start">
             {/* المنطقة 1: العنوان والتصنيفات */}
             <div className="flex flex-col gap-3">
-              <h1 className="text-2xl font-bold sm:text-3xl lg:text-4xl">{title}</h1>
+              <h1 className="text-base font-bold sm:text-lg md:text-xl lg:text-2xl">{title}</h1>
 
               <div className="flex flex-wrap justify-center gap-1.5 md:justify-start">
                 <Badge variant="default">{media.type}</Badge>
@@ -441,9 +370,9 @@ export default function ItemDetailPage() {
             {media.cast && media.cast.length > 0 && (
               <div className="border-border/50 mt-4 border-t pt-5">
                 <div className="mb-3 flex items-center justify-between gap-2">
-                  <h2 className="text-xl font-bold">
+                  <h2 className="text-base font-bold">
                     طاقم التمثيل
-                    <span className="text-muted-foreground ms-2 text-sm font-medium">
+                    <span className="text-muted-foreground ms-2 text-sm font-light">
                       ({media.cast.length})
                     </span>
                   </h2>
@@ -468,9 +397,9 @@ export default function ItemDetailPage() {
             {media.crew && media.crew.length > 0 && (
               <div className="border-border/50 mt-4 border-t pt-5">
                 <div className="mb-3 flex items-center justify-between gap-2">
-                  <h2 className="text-xl font-bold">
+                  <h2 className="text-base font-bold">
                     طاقم العمل
-                    <span className="text-muted-foreground ms-2 text-sm font-medium">
+                    <span className="text-muted-foreground ms-2 text-sm font-light">
                       ({media.crew.length})
                     </span>
                   </h2>

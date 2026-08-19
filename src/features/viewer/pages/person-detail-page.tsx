@@ -83,8 +83,8 @@ export default function PersonDetailPage() {
         ]}
       />
 
-      <div className="border-border bg-card/40 shadow-card flex flex-col gap-8 rounded-2xl border p-6 backdrop-blur-md md:flex-row md:items-start">
-        <div className="ring-primary/30 shadow-elevated mx-auto h-48 w-48 shrink-0 overflow-hidden rounded-full ring-4 md:mx-0 md:h-64 md:w-64">
+      <div className="border-border bg-card/40 shadow-card flex flex-col gap-4 rounded-2xl   p-6 backdrop-blur-md md:flex-row md:items-start">
+        <div className="ring-primary/30 shadow-elevated mx-auto h-40 w-40 shrink-0 overflow-hidden rounded-full ring-4 md:mx-0 md:h-64 md:w-64">
           {hasPhoto ? (
             <img
               src={person.id != null ? getPersonImageUrl(person.id) : ""}
