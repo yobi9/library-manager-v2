@@ -1,15 +1,16 @@
 "use client";
 
 /**
- * EventsPage – متابعة أحداث النظام والمستخدمين والأمان بأسلوب Monitoring Dark Minimalist.
+ * EventsPage – متابعة أحداث النظام والمستخدمين بأسلوب Monitoring Dark Minimalist.
  *
- * بنية الصفحة: ثلاثة صناديق مكدسة — "أحداث النظام" (شارات ملونة تعطي إشارة فورية
- * عن حالة الاستقرار) ثم "أحداث المستخدمين" (نص فضي هادئ للقراءة فقط) ثم
- * "أحداث الأمان" (محاولات دخول فاشلة + حظر/رفع حظر).
+ * بنية الصفحة: صندوقان مكدسان — "أحداث النظام" (شارات ملونة تعطي إشارة فورية
+ * عن حالة الاستقرار، ويشمل أحداث الأمان: محاولات دخول فاشلة + حظر/رفع حظر
+ * بفاصل بسيط) ثم "أحداث المستخدمين" (نص فضي هادئ للقراءة فقط).
  *
  * الآلية:
  * - السجل المحفوظ يُجلب من `/api/admin/events/history` عبر React Query.
- * - أحداث الأمان تُجلب من `/api/admin/events/security` بترحيل مستقل.
+ * - أحداث الأمان تُجلب من `/api/admin/events/security` بترحيل مستقل وتُعرض
+ *   ضمن صندوق "أحداث النظام".
  * - بث SSE يعيد الجلب فوراً عند وصول حدث جديد (دون خلط حمولات اللحظة مع السجل).
  * - زر "حذف كل الاحداث" يحذف الصفوف فعلياً من قاعدة البيانات.
  *
@@ -273,7 +274,7 @@ function SystemEventRow({ event }: { event: HistoryEvent }) {
         className={cn(
           "shrink-0 rounded px-2 py-1 text-xs font-medium",
           STATUS_CHIP_CLASSES[status],
-          isEnrichment ? "max-w-[85%] whitespace-normal" : "max-w-[70%] truncate",
+          isEnrichment ? "max-w-17/20 whitespace-normal" : "max-w-7/10 truncate",
         )}
       >
         {label}
@@ -353,7 +354,7 @@ function SecurityEventRow({ event }: { event: AdminSecurityEvent }) {
     <div className="hover:bg-muted/30 flex items-center gap-1 px-3 py-1 transition-colors">
       <span
         className={cn(
-          "max-w-[70%] shrink-0 truncate rounded px-2 py-1 text-xs font-medium",
+          "max-w-7/10 shrink-0 truncate rounded px-2 py-1 text-xs font-medium",
           chipClass,
         )}
       >
@@ -419,17 +420,11 @@ export function EventsPage() {
     isError,
     error,
     refetch,
-    fetchNextPage,
-    hasNextPage,
     isFetchingNextPage,
   } = useAdminEventsHistory(50, { pollingInterval: connected ? false : 15_000 });
-  const {
-    data: securityData,
-    isLoading: securityLoading,
-    fetchNextPage: fetchNextSecurityPage,
-    hasNextPage: hasMoreSecurity,
-    isFetchingNextPage: isFetchingSecurityPage,
-  } = useAdminSecurityEvents(50, { pollingInterval: connected ? false : 15_000 });
+  const { data: securityData } = useAdminSecurityEvents(50, {
+    pollingInterval: connected ? false : 15_000,
+  });
   const deleteAll = useDeleteAllEvents();
   const [confirmOpen, setConfirmOpen] = useState(false);
 
@@ -465,7 +460,6 @@ export function EventsPage() {
   const userEvents = pages.flatMap((p) => p.user);
   const systemTotal = pages[0]?.totals.system ?? 0;
   const userTotal = pages[0]?.totals.user ?? 0;
-  const hasMore = hasNextPage;
   const securityEvents = securityData?.pages.flatMap((p) => p.rows) ?? [];
 
   return (
@@ -519,8 +513,8 @@ export function EventsPage() {
 
         {/* بانر الخطأ عند فشل جلب السجل */}
         {isError && (
-            <div className="flex items-center justify-between gap-3 rounded-xl border border-danger-border bg-danger-bg px-4 py-3">
-            <p className="text-sm text-danger-text">
+          <div className="border-danger-border bg-danger-bg flex items-center justify-between gap-3 rounded-xl border px-4 py-3">
+            <p className="text-danger-text text-sm">
               {error instanceof Error ? error.message : "فشل تحميل الأحداث"}
             </p>
             <Button variant="outline" size="sm" onClick={() => void refetch()}>
@@ -529,16 +523,28 @@ export function EventsPage() {
           </div>
         )}
 
-        {/* صندوق أحداث النظام */}
+        {/* صندوق أحداث النظام (يشمل أحداث الأمان) */}
         <section className="space-y-3">
           <h2 className="text-foreground text-lg font-bold">احداث النظام</h2>
           <div className="admin-sunken admin-scroll max-h-105 overflow-y-auto rounded-xl border">
             {isLoading ? (
               <EventsBoxSkeleton />
-            ) : systemEvents.length === 0 ? (
+            ) : systemEvents.length === 0 && securityEvents.length === 0 ? (
               <EventsBoxEmpty message="لا توجد أحداث نظام بعد" />
             ) : (
-              systemEvents.map((event) => <SystemEventRow key={event.id} event={event} />)
+              <>
+                {systemEvents.map((event) => (
+                  <SystemEventRow key={event.id} event={event} />
+                ))}
+                {securityEvents.length > 0 && (
+                  <>
+                    <div className="bg-muted/40 my-1 h-px" aria-hidden />
+                    {securityEvents.map((event) => (
+                      <SecurityEventRow key={`sec-${event.event_id}`} event={event} />
+                    ))}
+                  </>
+                )}
+              </>
             )}
           </div>
         </section>
@@ -556,47 +562,6 @@ export function EventsPage() {
             )}
           </div>
         </section>
-
-        {/* صندوق أحداث الأمان */}
-        <section className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-foreground text-lg font-bold">احداث الامان</h2>
-            {hasMoreSecurity && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => void fetchNextSecurityPage()}
-                disabled={isFetchingSecurityPage}
-              >
-                {isFetchingSecurityPage ? "جاري التحميل..." : "عرض المزيد"}
-              </Button>
-            )}
-          </div>
-          <div className="admin-sunken admin-scroll max-h-80 overflow-y-auto rounded-xl border">
-            {securityLoading ? (
-              <EventsBoxSkeleton />
-            ) : securityEvents.length === 0 ? (
-              <EventsBoxEmpty message="لا توجد أحداث أمان بعد" />
-            ) : (
-              securityEvents.map((event) => <SecurityEventRow key={event.event_id} event={event} />)
-            )}
-          </div>
-        </section>
-
-        {/* تحميل المزيد */}
-        {hasMore && (
-          <div className="flex justify-center">
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-2"
-              onClick={() => void fetchNextPage()}
-              disabled={isFetchingNextPage}
-            >
-              {isFetchingNextPage ? "جاري التحميل..." : "عرض المزيد"}
-            </Button>
-          </div>
-        )}
       </div>
 
       {/* حوار تأكيد الحذف */}

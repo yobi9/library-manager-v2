@@ -38,7 +38,7 @@ export default function RatingsPage() {
               href={ROUTES.RATING_ITEMS(bucket.value) as import("next").Route}
               className="group border-border bg-card/60 shadow-card hover:border-primary/40 hover:bg-card hover:shadow-hover flex flex-col items-center gap-2 rounded-xl border p-4 text-center transition-all duration-300"
             >
-              <Star className="h-6 w-6 text-yellow-500" />
+              <Star className="text-rating-star h-6 w-6" />
               <span className="text-lg font-bold">{bucket.value}+</span>
               <span className="text-muted-foreground text-xs">{bucket.count} عنصر</span>
             </Link>

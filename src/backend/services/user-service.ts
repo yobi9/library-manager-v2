@@ -195,6 +195,22 @@ export class UserService {
     return this.sanitizeUser(user as Record<string, unknown>);
   }
 
+  /**
+   * يفرض حالة الحظر/رفعه على مستخدم محدد بعد التحقق من عدم استهداف الذات وصلاحية الأدمن.
+   *
+   * تسجيل الحدث يتم حصرياً في `security_events` (أحداث الأمان) عبر
+   * `SecurityEventRepository` — أُزيل التسجيل الموازي في `activities`
+   * (`block_user`/`unblock_user`) لإزالة التكرار (اكتشاف N19)، على غرار سابقة
+   * الترحيل 008 الذي أزال `login_success` المكرر من `security_events`. السجلات
+   * التاريخية السابقة في `activities` تبقى كما هي (لا تُمسّ ولا تُعرض إلا للقراءة).
+   *
+   * @param userId - معرّف المستخدم المستهدف بالحظر/رفعه.
+   * @param block - `true` للحظر، `false` لرفع الحظر.
+   * @param callerUserId - معرّف المستخدم المنفّذ (لا يُسمح بحظر نفسه).
+   * @param callerIsAdmin - صلاحية الأدمن (تُرفض العملية بدونها).
+   * @returns `true` عند نجاح التطبيق والتسجيل.
+   * @throws {Error} عند استهداف الذات، أو دون صلاحية أدمن، أو إذا لم يوجد المستخدم.
+   */
   async blockUser(userId: number, block: boolean, callerUserId: number, callerIsAdmin: boolean) {
     this.preventSelfAction(callerUserId, userId, "block");
     if (!callerIsAdmin) throw new Error("Unauthorized: admin only");
@@ -202,14 +218,6 @@ export class UserService {
     const user = await this.userRepo.getById(userId);
     if (!user) throw new Error("User not found");
     await this.userRepo.blockUser(userId, block);
-
-    await this.activityRepo.logActivity({
-      userId: callerUserId,
-      action: block ? "block_user" : "unblock_user",
-      details: { targetUserId: userId },
-      module: "users",
-      entityType: "system",
-    });
 
     await this.securityRepo.logSecurityEvent({
       userId: callerUserId,

@@ -28,6 +28,12 @@
 # misc
 .DS_Store
 *.pem
+
+# local development artifacts (archives, screenshot tooling, editor settings)
+*.rar
+/screenshots/
+/screenshot-*.mjs
+.vscode/
  
 # debug
 npm-debug.log*

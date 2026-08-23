@@ -71,43 +71,6 @@ export class CacheService {
     }
   }
 
-  configure(settings: Record<string, unknown> = {}): void {
-    if (settings.enable_cache !== undefined) {
-      this.settings.enabled = Boolean(settings.enable_cache);
-      if (!this.settings.enabled) {
-        this.clear();
-      }
-    }
-    if (settings.cache_ttl_short !== undefined) {
-      this.settings.defaultTTL = Math.max(10, Math.min(3600, Number(settings.cache_ttl_short)));
-    }
-    if (settings.cache_ttl_medium !== undefined) {
-      this.settings.staleTTL = Math.max(60, Math.min(7200, Number(settings.cache_ttl_medium)));
-    }
-    if (settings.cache_ttl_long !== undefined) {
-      this.settings.longTTL = Math.max(300, Math.min(604800, Number(settings.cache_ttl_long)));
-    }
-    if (settings.maxSize !== undefined) {
-      this.settings.maxSize = Math.max(100, Math.min(50000, Number(settings.maxSize)));
-    }
-    if (settings.cleanupInterval !== undefined) {
-      this.settings.cleanupInterval = Math.max(10, Math.min(600, Number(settings.cleanupInterval)));
-      this._startCleanupInterval();
-    }
-    if (settings.enable_cache_warming !== undefined) {
-      this.settings.enableCacheWarming = Boolean(settings.enable_cache_warming);
-    }
-    if (settings.enableMemoryMonitoring !== undefined) {
-      this.settings.enableMemoryMonitoring = Boolean(settings.enableMemoryMonitoring);
-      if (this.settings.enableMemoryMonitoring && !this._memoryInterval) {
-        this._startMemoryMonitoring();
-      } else if (!this.settings.enableMemoryMonitoring && this._memoryInterval) {
-        clearInterval(this._memoryInterval);
-        this._memoryInterval = null;
-      }
-    }
-  }
-
   getTTL(tier: "short" | "medium" | "long" = "short"): number {
     switch (tier) {
       case "short":

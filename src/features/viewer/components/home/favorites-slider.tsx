@@ -28,7 +28,7 @@ export function FavoritesSlider() {
     <UnifiedMedia
       mode="slider"
       title="المفضلة"
-      icon={<Heart className="h-5 w-5 text-destructive" />}
+      icon={<Heart className="text-primary h-5 w-5" />}
       items={favorites.map((id) => itemMap.get(id)).filter(Boolean) as MediaItem[]}
       isLoading={loading}
       mapItemToProps={mapMediaToCard}

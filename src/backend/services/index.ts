@@ -13,8 +13,6 @@ import { VisitorRepository } from "../repositories/visitor-repository";
 import { DashboardRepository } from "../repositories/dashboard-repository";
 import { NewsRepository } from "../repositories/news-repository";
 import { MessagesRepository } from "../repositories/messages-repository";
-import { AdsRepository } from "../repositories/ads-repository";
-import { StoreProductsRepository } from "../repositories/store-products-repository";
 import { TranslationCacheRepository } from "../repositories/translation-cache-repository";
 import { ImageRepository } from "../repositories/image-repository";
 import { EnrichmentMediaRepository } from "../repositories/enrichment-media-repository";
@@ -30,6 +28,7 @@ import { SettingsService } from "./settings-service";
 import { ActivityService } from "./activity-service";
 import { SecurityService } from "./security-service";
 import { VisitorService } from "./visitor-service";
+import { ViewerAccessService } from "./viewer-access-service";
 import { ProgressService } from "./progress-service";
 import { ReportService } from "./report-service";
 import { DashboardService } from "./dashboard-service";
@@ -39,8 +38,6 @@ import { DatabaseService } from "./database-service";
 import { ImageService } from "./image-service";
 import { NewsService } from "./news-service";
 import { MessagesService } from "./messages-service";
-import { AdsService } from "./ads-service";
-import { StoreProductsService } from "./store-products-service";
 import { EventBus, getEventBus } from "./event-bus";
 import { getDatabase, runInWriterContext } from "../db/db";
 import { CacheService, getCacheService } from "./cache-service";
@@ -114,8 +111,6 @@ function createServices() {
   const enrichmentApprovalRepo = new EnrichmentApprovalRepository();
   const newsRepo = new NewsRepository();
   const messagesRepo = new MessagesRepository();
-  const adsRepo = new AdsRepository();
-  const storeProductsRepo = new StoreProductsRepository();
 
   const eventBus = getEventBus();
   const cacheService = getCacheService(activityRepo);
@@ -138,18 +133,24 @@ function createServices() {
   );
   const userService = new UserService(userRepo, sessionRepo, activityRepo, securityRepo);
   const libraryService = new LibraryService(libraryRepo, mediaRepo, activityRepo);
+  const settingsService = new SettingsService(settingsRepo, cacheService);
   const mediaService = new MediaService(
     mediaRepo,
     libraryRepo,
     cacheService,
+    settingsService,
     activityRepo,
     searchRepo,
   );
-  const searchService = new SearchService(searchRepo, cacheService, () => scanActivity.isActive());
-  const settingsService = new SettingsService(settingsRepo, cacheService);
+  const searchService = new SearchService(searchRepo, cacheService, settingsService, () => scanActivity.isActive());
   const activityService = new ActivityService(activityRepo);
   const securityService = new SecurityService(securityRepo);
   const visitorService = new VisitorService(visitorRepo, activityRepo);
+  const viewerAccessService = new ViewerAccessService(
+    settingsService,
+    authService,
+    visitorService,
+  );
   const progressService = new ProgressService(progressRepo);
   const reportService = new ReportService(reportRepo, activityRepo);
   const dashboardService = new DashboardService(
@@ -165,8 +166,6 @@ function createServices() {
   const imageService = new ImageService(imageRepo, settingsService);
   const newsService = new NewsService(newsRepo, activityRepo);
   const messagesService = new MessagesService(messagesRepo, activityRepo);
-  const adsService = new AdsService(adsRepo, activityRepo);
-  const storeProductsService = new StoreProductsService(storeProductsRepo, activityRepo);
   const translationService = new TranslationService(mediaRepo, translationCacheRepo, activityRepo);
   const tmdbEnrichmentService = new TmdbEnrichmentService(
     enrichmentMediaRepo,
@@ -316,6 +315,7 @@ function createServices() {
     activity: activityService,
     security: securityService,
     visitor: visitorService,
+    viewerAccess: viewerAccessService,
     progress: progressService,
     report: reportService,
     dashboard: dashboardService,
@@ -326,8 +326,6 @@ function createServices() {
     image: imageService,
     news: newsService,
     messages: messagesService,
-    ads: adsService,
-    storeProducts: storeProductsService,
     enrichmentMediaRepo,
     enrichmentApproval: enrichmentApprovalRepo,
     tmdbEnrichment: tmdbEnrichmentService,

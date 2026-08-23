@@ -1,5 +1,5 @@
 import { useInfiniteQuery } from "@tanstack/react-query";
-import { apiFetch } from "@/lib/frontend/api";
+import { apiFetch } from "@/lib/frontend/api-client";
 
 /**
  * A single persisted security event as returned by the

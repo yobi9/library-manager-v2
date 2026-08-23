@@ -1,12 +1,13 @@
 import { BaseController } from "./base-controller";
 import type { SearchService } from "../services/search-service";
+import type { AuthContext } from "../api/route-helpers";
 
 export class SearchController extends BaseController {
   constructor(private searchService: SearchService) {
     super();
   }
 
-  async search(params: Record<string, string>) {
+  async search(params: Record<string, string>, auth?: AuthContext) {
     try {
       const result = await this.searchService.searchMedia({
         q: params["q"],
@@ -15,6 +16,7 @@ export class SearchController extends BaseController {
         year: params["year"] ? Number(params["year"]) : undefined,
         page: this.parsePage(params["page"], 1),
         limit: this.parseLimit(params["limit"], 20),
+        auth,
       });
       return this.ok(result);
     } catch (err) {
@@ -22,10 +24,10 @@ export class SearchController extends BaseController {
     }
   }
 
-  async liveSearch(q: string, limitStr?: string) {
+  async liveSearch(q: string, limitStr?: string, auth?: AuthContext) {
     try {
       const limit = this.parseLimit(limitStr, 8);
-      const results = await this.searchService.liveSearch(q, limit);
+      const results = await this.searchService.liveSearch(q, limit, auth);
       return this.ok(results);
     } catch (err) {
       return this.handleError(err);

@@ -20,13 +20,21 @@ Library/media manager: Next.js 16 (App Router, `output: "standalone"`), React 19
 ## Hard Rules
 
 * **Read before writing.** Before modifying any file, read the relevant existing implementation and its surrounding context.
-* **Do not guess.** Never invent APIs, file paths, types, database relationships, configuration values, or project conventions. Verify them in the actual codebase first.
-* **Do not assume.** If the required behavior, architecture, ownership, or intended outcome is unclear, stop and ask before making a change.
+
+ * **Do not guess blindly, but provide reasoned hypotheses.** Never invent APIs, file paths, or types. However, if a root cause is uncertain, do not stay silent; instead, present a structured list of potential causes (ranked from most likely to least likely) and explain how to verify each one.
+ 
+<!-- * **Do not assume.** If the required behavior, architecture, ownership, or intended outcome is unclear, stop and ask before making a change. -->
+* **Do not assume, prompt actively.** If the required behavior, architecture, ownership, or intended outcome is unclear, do not stop silently or give a generic response. You must immediately generate a specific, numbered list of clarifying questions for the user to answer before proceeding with any changes.
+
+
 * **Follow the existing implementation.** Prefer established project patterns over introducing a new abstraction, convention, dependency, or architecture.
 * **Trace before changing.** For bugs or behavior changes, trace the relevant flow end-to-end before editing: route/page → API → controller → service → repository → database, as applicable.
 * **Check all consumers.** Before changing a shared function, type, API contract, repository method, service, hook, or component, inspect its callers and consumers.
 * **Preserve business logic.** Do not silently change behavior while refactoring, reorganizing, deduplicating, or improving code.
-* **No speculative fixes.** Do not make changes merely because something looks unusual, duplicated, unused, or inconsistent. First establish whether it is actually incorrect and why.
+<!-- * **No speculative fixes.** Do not make changes merely because something looks unusual, duplicated, unused, or inconsistent. First establish whether it is actually incorrect and why. -->
+
+* **Propose solutions instead of speculative fixes.** Do not apply blind edits because something looks unusual. Instead, offer the user 2-3 logical alternative approaches, highlighting the pros, cons, and risks of each, and wait for confirmation before writing code.
+
 * **No broad rewrites.** Make the smallest justified change that solves the verified problem. Do not rewrite unrelated code.
 * **Use the project's existing abstractions.** Do not bypass controllers, services, repositories, DI, API helpers, cache infrastructure, or other established boundaries without verifying that the existing abstraction is insufficient.
 * **Verify before declaring success.** After a change, run the narrowest relevant validation first, then broader checks when appropriate. Do not claim a fix is complete without evidence.
@@ -74,7 +82,7 @@ Library/media manager: Next.js 16 (App Router, `output: "standalone"`), React 19
 * Never run destructive SQL against the live `data/media_library.db` (use a copy or `:memory:`).
 * `.env.production` in the repo is a template; the installer generates real per-machine values. Don't commit real secrets.
 * `JWT_SECRET` mismatch note: `auth-service.ts` hardcodes 2h token expiry; env files say `JWT_EXPIRES_IN=7d` — don't "fix" one side without checking both.
-* `sql.js` and `@types/better-sqlite3` in package.json are unused; don't add imports of them.
+* `sql.js` and `@types/sqlite3` in package.json are unused; don't add imports of them.
 
 ## Skills available in this project
 
@@ -111,6 +119,29 @@ TSDoc is part of the code. Every newly created or modified function must have co
 
 
 
+## Project structure
+
+```
+src/
+├── app/           # App Router: (viewer)/, (admin)/, (auth)/, api/ (19 route groups)
+│   └── page.tsx   # ONE file per route — no page-wrapper/page-client (flat pattern)
+├── backend/       # Clean Architecture: Controllers → Services → Repositories → DB
+│   ├── controllers/ (20 files, singletons via getControllers())
+│   ├── services/ (20+ files, singletons via getServices())
+│   ├── repositories/ (24 files)
+│   ├── db/        # db.ts (WAL+retry), schema.ts (23 tables), migrations/
+│   ├── api/       # route-helpers.ts (buildContext, toNextResponse, requireAuth)
+│   ├── middleware/ # rate-limiter, maintenance, visitor-tracking
+│   └── scanner/   # ScanOrchestrator, FolderWatcher, etc. (13 files)
+├── features/      # Feature modules (owned by features, not routes)
+│   ├── viewer/pages/  # lib-items, item-detail, live-stream, people, person-detail, player, watch-later, years
+│   │   └── home/      # hero, pinned-slider, favorites-slider, TypeSectionSlider
+│   └── auth/pages/    # login-page
+├── shared/        # components/ui/ (16), components/layout/, constants/, hooks/, types/, utils/
+├── lib/           # config/env.ts (Zod-validated), frontend/, utils.ts
+├── providers/     # QueryClientProvider + AuthProvider + ThemeProvider (next-themes) + Toaster (Sonner)
+└── public/        # Uploaded images (src/public/assets/...)
+```
 
 
 

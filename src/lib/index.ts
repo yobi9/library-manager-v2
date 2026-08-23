@@ -1,1 +1,1 @@
-export { getEnv, getCorsOrigins } from "./config";
+export { getEnv } from "./config";

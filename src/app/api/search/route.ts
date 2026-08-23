@@ -1,9 +1,10 @@
 import { NextRequest } from "next/server";
 import { getControllers } from "@/backend/controllers";
-import { getQueryParam, viewerResponse, handleRouteError } from "@/backend/api/route-helpers";
+import { parseAuthFromRequest, getQueryParam, viewerResponse, handleRouteError } from "@/backend/api/route-helpers";
 
 export async function GET(request: NextRequest) {
   try {
+    const auth = parseAuthFromRequest(request);
     const c = getControllers();
     return viewerResponse(await c.search.search({
       q: getQueryParam(request, "q") ?? "",
@@ -12,7 +13,7 @@ export async function GET(request: NextRequest) {
       year: getQueryParam(request, "year") ?? "",
       page: getQueryParam(request, "page") ?? "1",
       limit: getQueryParam(request, "limit") ?? "20",
-    }));
+    }, auth ?? undefined));
   } catch (error) {
     return handleRouteError(error);
   }

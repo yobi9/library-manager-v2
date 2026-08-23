@@ -71,9 +71,8 @@ export function ListingPage({
     //  <div className="mx-auto max-w-7xl space-y-6 px-4 py-6">
     <div className="mx-auto max-w-7xl space-y-4 sm:space-y-6 px-3 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6 md:py-8">
         <Breadcrumbs items={breadcrumbs} />
-        <div className="flex items-center gap-2">
-          <Spinner />
-          <span className="text-muted-foreground">جاري التحميل...</span>
+        <div className="flex items-center justify-center py-4">
+          <Spinner size="lg" label="جاري التحميل..." labelPosition="bottom" />
         </div>
         <UnifiedMedia mode="grid" isLoading skeletonCount={12} />
       </div>
@@ -117,7 +116,14 @@ export function ListingPage({
 
       {hasMore && onLoadMore && (
         <div ref={loadMoreRef} className="text-muted-foreground animate-pulse py-20 text-center">
-          {isLoadingMore ? "جاري تحميل المزيد..." : "حمّل المزيد"}
+          {isLoadingMore ? (
+            <span className="flex items-center justify-center gap-2">
+              <Spinner size="sm" />
+              جاري تحميل المزيد...
+            </span>
+          ) : (
+            "حمّل المزيد"
+          )}
         </div>
       )}
     </div>

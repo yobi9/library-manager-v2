@@ -1,6 +1,5 @@
-// src/features/admin/hooks/use-admin-visitor-requests.ts
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiFetch, apiPost, apiDelete } from "@/lib/frontend/api";
+import { apiFetch, apiPost, apiDelete } from "@/lib/frontend/api-client";
 
 /**
  * A visitor request submitted through the public contact form and stored

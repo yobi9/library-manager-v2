@@ -220,6 +220,22 @@ export const SETTINGS_REGISTRY: readonly SettingDefinition[] = [
     isPublic: false,
     description: "وضع الصيانة: يُغلق الواجهة العامة أمام غير المدراء.",
   },
+  {
+    key: "parental_control_enabled",
+    type: "boolean",
+    defaultValue: false,
+    category: "viewer",
+    isPublic: false,
+    description: "تفعيل حظر المحتوى بالتصنيفات العمرية — يُخفى المحتوى المحظور من جميع المستخدمين (عدا المدير).",
+  },
+  {
+    key: "blocked_certifications",
+    type: "json",
+    defaultValue: [] as string[],
+    category: "viewer",
+    isPublic: false,
+    description: "قائمة التصنيفات العمرية المحظورة — مصفوفة نصوص (مثل [\"R\", \"NC-17\"]).",
+  },
 
   // ============ Home sections ============
   {
@@ -355,6 +371,8 @@ export const SETTINGS_REGISTRY: readonly SettingDefinition[] = [
     description:
       "المسار الأساسي لتخزين صور الإثراء المحلية — مسار مطلق خارج جذر المشروع (مثل D:\\assets\\images\\enriched) يُقرأ منه مباشرة، أو مسار نسبي لجذر الويب يُحل داخل public. صيغة المسارات المخزَّنة في القاعدة تبقى web-relative (/assets/images/enriched/...).",
   },
+ 
+ 
   {
     key: "image_placeholder_dir",
     type: "string",

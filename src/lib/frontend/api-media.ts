@@ -5,6 +5,7 @@ import type { PublicSettings, ExclusiveSettingItem } from "@/shared/types/settin
 // Matches MediaApiDTO from backend (src/shared/types/media-api.ts)
 // Dual field names: backend sends both snake_case and camelCase
 export interface MediaItem {
+  voteCount: any;
   media_id: number;
   id?: number;
   title: string;
@@ -109,6 +110,7 @@ export interface Library {
   scan_progress?: number;
   language?: string | null;
   country?: string | null;
+  created_at?: string | null;
 }
 
 // ============= PERSON TYPE =============
@@ -156,6 +158,12 @@ export interface MediaFilterResponse {
 }
 
 // ============= LIBRARY MEDIA =============
+
+/**
+ * معاملات قائمة وسائط المكتبة. الترقيم بوضعين: `offset` (توافق قديم) أو
+ * `cursor` (keyset — المفضل للتمرير اللانهائي، محصّن ضد الإدراج المتزامن).
+ * لا يُرسل الوضعان معاً؛ وجود cursor يلغي أثر offset في الخادم.
+ */
 export interface LibraryMediaParams {
   offset?: number;
   limit?: number;
@@ -166,8 +174,16 @@ export interface LibraryMediaParams {
   search?: string;
   genre?: string;
   certification?: string;
+  /** رمز ترقيم keyset معتم أعادته الصفحة السابقة في pagination.nextCursor. */
+  cursor?: string;
 }
 
+/**
+ * استجابة قائمة وسائط المكتبة. حقول `items/media/data` و`total/hasMore`
+ * العلوية توافق دفاعي مع أشكال تاريخية؛ الشكل الفعلي من الخادم هو
+ * `pagination` + `items`. في وضع المؤشر يأتي `nextCursor` (نص لصفحة تالية،
+ * null عند النهاية) ويغيب `offset`؛ وفي وضع OFFSET يأتي `offset` ويغيب `nextCursor`.
+ */
 export interface LibraryMediaResponse {
   items?: MediaItem[];
   media?: MediaItem[];
@@ -179,6 +195,7 @@ export interface LibraryMediaResponse {
     hasMore: boolean;
     limit?: number;
     offset?: number;
+    nextCursor?: string | null;
   };
 }
 
@@ -258,17 +275,46 @@ export async function fetchLibraries(): Promise<Library[]> {
   return [];
 }
 
+/**
+ * يجلب قائمة وسائط مكتبة عبر `GET /api/libraries/:id/media` بدعم وضعَي
+ * ترقيم متبادلَين وفق عقد `LibraryMediaParams`:
+ *
+ * - وضع المؤشر (keyset): عند وجود `cursor` يُرسَل وحده **دون** `offset`،
+ *   ويعيد الخادم `pagination.nextCursor` لطلب الصفحة التالية.
+ * - وضع OFFSET (توافق قديم): عند غياب `cursor` يُرسَل `offset`
+ *   (افتراضياً 0).
+ *
+ * @remarks إسقاط `cursor` من معاملات الطلب كان السبب الجذري لتكرار عناصر
+ * التمرير اللانهائي: كل طلب صفحة لاحقة كان يصل بلا مؤشر ومع `offset=0`،
+ * فيعيد الخادم رأس القائمة من جديد فتتكرر العناصر المعروضة (تحذير React
+ * keys المكررة في UnifiedMedia).
+ *
+ * @param libraryId - معرّف المكتبة الرقمي.
+ * @param params - معاملات القائمة: الترقيم (`cursor` أو `offset` —
+ *        متبادلان لا يُرسَلان معاً)، حجم الصفحة، الفرز والاتجاه، والفلاتر
+ *        الاختيارية (year/search/genre/certification) التي تُرسَل فقط عند
+ *        تحديدها.
+ * @returns استجابة الخادم الخام: عناصر الوسائط مع `pagination`
+ *          ({total, hasMore, nextCursor} في وضع المؤشر أو {total, offset,
+ *          hasMore} في وضع OFFSET).
+ * @throws {@link ApiError} عند فشل HTTP أو استجابة `success: false`.
+ */
 export async function fetchLibraryMedia(
   libraryId: number,
   params: LibraryMediaParams,
 ): Promise<LibraryMediaResponse> {
   const searchParams: Record<string, string> = {
-    offset: String(params.offset ?? 0),
     limit: String(params.limit ?? 24),
     sortBy: params.sortBy ?? "recent",
     sortOrder: params.sortOrder ?? "DESC",
     rootOnly: params.rootOnly ?? "true",
   };
+  // وضعا الترقيم متبادلان تعاقدياً: وجود المؤشر يحذف offset والعكس صحيح.
+  if (params.cursor) {
+    searchParams.cursor = params.cursor;
+  } else {
+    searchParams.offset = String(params.offset ?? 0);
+  }
   if (params.year) searchParams.year = params.year;
   if (params.search) searchParams.search = params.search;
   if (params.genre) searchParams.genre = params.genre;

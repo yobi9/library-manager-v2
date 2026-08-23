@@ -1,7 +1,6 @@
 import { NextRequest } from "next/server";
 import { toNextResponse, requireAdmin, parseBody, handleRouteError } from "@/backend/api/route-helpers";
-import { getServices } from "@/backend/services";
-import { ScanController } from "@/backend/controllers/scan-controller";
+import { getControllers } from "@/backend/controllers";
 
 export async function POST(
   request: NextRequest,
@@ -11,9 +10,8 @@ export async function POST(
     requireAdmin(request);
     const { id } = await params;
     const body = await parseBody(request);
-    const s = getServices();
-    const controller = new ScanController(s.scanner, s.library);
-    return toNextResponse(await controller.startScan(id, {
+    const { scan } = getControllers();
+    return toNextResponse(await scan.startScan(id, {
       deepScan: body["deepScan"] as boolean ?? false,
       forceRescan: body["forceRescan"] as boolean ?? false,
     }));

@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import fs from "node:fs";
 import { getControllers } from "@/backend/controllers";
-import { toNextResponse, handleRouteError } from "@/backend/api/route-helpers";
+import { parseAuthFromRequest, toNextResponse, handleRouteError } from "@/backend/api/route-helpers";
 
 /**
  * File metadata produced by MediaController.getStreamTarget for the video player.
@@ -94,7 +94,8 @@ function toWebReadable(source: fs.ReadStream): ReadableStream<Uint8Array> {
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    const result = await getControllers().media.getStreamTarget(id);
+    const auth = parseAuthFromRequest(req);
+    const result = await getControllers().media.getStreamTarget(id, auth ?? undefined);
     if (!result.success || !result.data) return toNextResponse(result);
 
     const target = result.data as StreamTarget;

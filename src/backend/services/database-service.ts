@@ -3,6 +3,7 @@ import { ActivityRepository } from "../repositories/activity-repository";
 import { CacheService } from "./cache-service";
 import { CachePrefixes } from "./cache-prefixes";
 import { closeDatabase } from "../db/db";
+import { getEventBus } from "./event-bus";
 import { logger } from "../observability/logger";
 import { ensureDirs } from "../utils/path-utils";
 import fs from "fs/promises";
@@ -203,6 +204,10 @@ export class DatabaseService {
    * re-initializes a fresh connection against the restored file; the app is
    * expected to be restarted afterwards so migrations run cleanly.
    *
+   * يُعلَن انقطاع قصير عبر حدث `system_alert` (3.5.5) قبل إغلاق الاتصالين وبعد
+   * اكتمال الكتابة، بحيث يتلقى مشغّل أحداث SSE (`/api/admin/events`) نافذة
+   * «صيانة» معلنة بدل انقطاع صامت يعلق طلبات العملاء بلا تنبيه.
+   *
    * @param file - Uploaded backup file (`.db` only in the new format).
    */
   async restoreBackup(file: File): Promise<void> {
@@ -217,6 +222,12 @@ export class DatabaseService {
     if (buffer.byteLength === 0) {
       throw new Error("الملف المرفوع فارغ");
     }
+    // إعلان بدء نافذة الصيانة (3.5.5): يُبث قبل إغلاق الاتصالين حتى يظهر في
+    // لوحة أحداث الأدمن لحظياً.
+    getEventBus().emit("system_alert", {
+      type: "warning",
+      message: "بدء استعادة قاعدة البيانات — انقطاع قصير متوقع أثناء الاستبدال.",
+    });
     await closeDatabase();
     const mainDbPath = this.dbRepo.getDbPath();
     await fs.writeFile(mainDbPath, buffer);
@@ -233,6 +244,11 @@ export class DatabaseService {
       .catch((err: Error) => {
         console.error("[DatabaseService] Failed to log restore:", err.message);
       });
+    // إعلان اكتمال الاستعادة: الاتصالان يُعاد فتحهما تلقائياً عند أول طلب لاحق.
+    getEventBus().emit("system_alert", {
+      type: "success",
+      message: "اكتملت استعادة قاعدة البيانات — يُعاد فتح الاتصال تلقائياً عند الطلب التالي.",
+    });
     await this.cache.deleteByPrefix(CachePrefixes.database);
   }
 

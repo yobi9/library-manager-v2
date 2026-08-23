@@ -39,7 +39,7 @@ import { useAdminSummary } from "@/features/admin/hooks/use-admin-dashboard";
 import { useScanEvents } from "@/features/admin/hooks/use-scan-events";
 import type { Library } from "@/lib/frontend/api-media";
 import { Plus, RefreshCw, ChevronDown, Library as LibraryIcon } from "lucide-react";
-
+import { ApiError } from "@/lib/frontend/api-client";
 /**
  * تطبيع قيمة setting من API إلى boolean صريح.
  * الـ API قد يعيد boolean (true/false) أو string ("true"/"false") أو number (1/0).
@@ -76,8 +76,6 @@ const HOME_SECTIONS = [
   { id: "show_series_doc", label: "وثائقيات", type: "series_doc" },
   { id: "show_series_learn", label: "تعليمية", type: "series_learn" },
   { id: "show_series_deen", label: "دينية", type: "series_deen" },
-    
-    
 ];
 
 /**
@@ -145,9 +143,12 @@ export function LibrariesPage() {
   const scanTargetId = activeScanId ?? scanProgress?.libraryId ?? null;
 
   /**
-   * إغلاق نافذة الفحص وتسجيل نقطة الرفض كي لا تعود فوراً قبل وصول الحدث التالي.
+   * إغلاق نافذة الفحص وتسجيل نقطة الرفض كي لا تعود قبل وصول حدث جديد.
+   * أثناء فحص نشط تُتجاهل المحاولة تماماً: النافذة مقيّدة بـ`disableClose`
+   * ولا تُغلق إلا بعد انتهاء المسح الجاري فعلياً (اكتمالاً أو إيقافاً أو فشلاً).
    */
   const handleScanModalClose = () => {
+    if (isActiveScan) return;
     setScanModalOpen(false);
     setDismissedProgress(scanProgress);
   };
@@ -244,19 +245,44 @@ export function LibrariesPage() {
       if (library.type === "main" || library.isContainer) {
         setCurrentFolderId(library.library_id);
         setFolderHistory((prev) => [...prev, { id: library.library_id, name: library.name }]);
-      } 
+      }
       // إزالة else التي تفتح نموذج التعديل
-    // else {
-    //   setEditingLibrary(library);
-    //   setFormMode("edit");
-    // }
-   
+      // else {
+      //   setEditingLibrary(library);
+      //   setFormMode("edit");
+      // }
     },
     [setCurrentFolderId, setFolderHistory, setEditingLibrary, setFormMode],
   );
 
   /**
-   * بدء فحص مكتبة محددة. يفتح نافذة تقدم الفحص ويستدعي API البدء.
+   * معالجة فشل طلب بدء فحص (مكتبة واحدة أو فحص الكل).
+   *
+   * عند الرفض بسبب مسح جارٍ (HTTP 409) لا تُعَدّ المحاولة خطأً للمستخدم:
+   * تُوجَّه النافذة إلى المسح الجاري فعلياً عبر تصفير `activeScanId`، فيشترك
+   * SSE بدون `libraryId` ويعيد الخادم تقدم العملية النشطة عبر
+   * `getActiveProgress()` — وتظل النافذة مقفولة حتى انتهائه.
+   * أما بقية الإخفاقات فتُغلَق النافذة ويُعرض سبب الخادم الحقيقي من رسالة
+   * `ApiError` بدل رسالة عامة.
+   *
+   * @param err - الخطأ الراجع من mutation (`ApiError` من عميل API عادةً).
+   * @param fallbackMessage - رسالة التوست عند خطأ غير `ApiError` (يحفظ نصّ السياق).
+   */
+  const handleScanStartFailure = (err: unknown, fallbackMessage: string) => {
+    if (err instanceof ApiError && err.statusCode === 409) {
+      toast.info(err.message);
+      setActiveScanId(null);
+      setScanModalOpen(true);
+      return;
+    }
+    setActiveScanId(null);
+    setScanModalOpen(false);
+    toast.error(err instanceof ApiError ? err.message : fallbackMessage);
+  };
+
+  /**
+   * بدء فحص مكتبة محددة. يفتح نافذة تقدم الفحص ويستدعي API البدء؛ عند الفشل
+   * يُدار الخطأ عبر `handleScanStartFailure` (إغلاق النافذة أو التوجيه للمسح الجاري).
    *
    * @param libraryId - رقم المكتبة.
    */
@@ -270,8 +296,8 @@ export function LibrariesPage() {
           deepScan: deepScanEnabled,
           forceRescan: deepScanEnabled,
         });
-      } catch {
-        toast.error("فشل بدء الفحص");
+      } catch (err) {
+        handleScanStartFailure(err, "فشل بدء الفحص");
       }
     },
     [setActiveScanId, setScanModalOpen, deepScanEnabled, startScanMutation],
@@ -294,7 +320,8 @@ export function LibrariesPage() {
   );
 
   /**
-   * بدء فحص جميع المكتبات. يفتح نافذة التقدم ويستدعي scan-all API.
+   * بدء فحص جميع المكتبات. يفتح نافذة التقدم ويستدعي scan-all API؛ عند الفشل
+   * يُدار الخطأ عبر `handleScanStartFailure` (إغلاق النافذة أو التوجيه للمسح الجاري).
    */
   const handleScanAll = useCallback(async () => {
     setActiveScanId(null);
@@ -304,8 +331,8 @@ export function LibrariesPage() {
         deepScan: deepScanEnabled,
         forceRescan: deepScanEnabled,
       });
-    } catch {
-      toast.error("فشل فحص الكل");
+    } catch (err) {
+      handleScanStartFailure(err, "فشل فحص الكل");
     }
   }, [setActiveScanId, setScanModalOpen, deepScanEnabled, scanAllMutation]);
 
@@ -354,8 +381,20 @@ export function LibrariesPage() {
    */
   const handleDeleteConfirm = useCallback(async () => {
     if (!deleteTarget) return;
-    await deleteMutation.mutateAsync(deleteTarget.library_id);
-    setDeleteTarget(null);
+    try {
+      await deleteMutation.mutateAsync(deleteTarget.library_id);
+      toast.success(`تم حذف "${deleteTarget.name}" بنجاح`);
+      setDeleteTarget(null);
+    } catch (err) {
+      // سيظهر لك السبب الحقيقي لرفض السيرفر
+      if (err instanceof ApiError) {
+        toast.error(err.message);
+      } else {
+        toast.error("فشل حذف المكتبة، ربما تحتوي على وسائط مرتبطة");
+      }
+      // إغلاق النافذة حتى في حالة الفشل لكي لا تظل معلقة
+      setDeleteTarget(null);
+    }
   }, [deleteTarget, deleteMutation, setDeleteTarget]);
 
   /**
@@ -539,7 +578,7 @@ export function LibrariesPage() {
         )}
       </div>
       {/* ===== قسم إدارة المكتبات – تأثير طفو مع ظل ===== */}
-      <div className="bg-secondary shadow-card hover:shadow-hover space-y-4 rounded-lg p-4 transition-shadow">
+      <div className="bg-secondary space-y-4 rounded-lg p-4">
         {/* شريط العنوان والأزرار */}
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="space-y-1">
@@ -625,7 +664,7 @@ export function LibrariesPage() {
             }
           }}
         >
-          <ModalContent className="sm:max-w-md">
+          <ModalContent disableClose={isActiveScan} className="sm:max-w-md">
             <ModalHeader>
               <ModalTitle>حالة الفحص</ModalTitle>
               <ModalDescription>
@@ -642,11 +681,13 @@ export function LibrariesPage() {
               isResuming={resumeScanMutation.isPending}
               isStopping={stopScanMutation.isPending}
             />
-            <ModalFooter>
-              <Button variant="outline" onClick={handleScanModalClose}>
-                إغلاق
-              </Button>
-            </ModalFooter>
+            {!isActiveScan && (
+              <ModalFooter>
+                <Button variant="outline" onClick={handleScanModalClose}>
+                  إغلاق
+                </Button>
+              </ModalFooter>
+            )}
           </ModalContent>
         </Modal>
       </div>

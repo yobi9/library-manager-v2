@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiFetch, apiPost } from "@/lib/frontend/api";
+import { apiFetch, apiPost } from "@/lib/frontend/api-client";
 
 export interface ScanProcess {
   library_id: number;
@@ -17,12 +17,12 @@ interface ProcessesResponse {
 }
 
 /**
- * Fetch all library scan processes.
+ * Fetch all library scan processes from the scan-status endpoint.
  *
  * @returns Object with `rows` array of ScanProcess and `total` count.
  */
 async function fetchAdminProcesses(): Promise<ProcessesResponse> {
-  const res = await apiFetch<ProcessesResponse>("/api/progress");
+  const res = await apiFetch<ProcessesResponse>("/api/scan/processes");
   if (!res.success || !res.data) throw new Error(res.error ?? "فشل تحميل العمليات");
   return res.data;
 }

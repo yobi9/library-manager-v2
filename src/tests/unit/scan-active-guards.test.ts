@@ -189,7 +189,7 @@ describe("Scan-active guards على العمليات الخلفية", () => {
 
       const rebuildIndex = vi.fn().mockResolvedValue(undefined);
       const repoStub = { rebuildIndex } as unknown as SearchRepository;
-      const service = new SearchService(repoStub, cache, scan.isScanning);
+      const service = new SearchService(repoStub, cache, {} as unknown as SettingsService, scan.isScanning);
 
       await expect(service.rebuildIndex()).rejects.toThrow(/لا يمكن إعادة بناء فهرس البحث/);
       expect(rebuildIndex).not.toHaveBeenCalled();
@@ -201,7 +201,7 @@ describe("Scan-active guards على العمليات الخلفية", () => {
 
       const rebuildIndex = vi.fn().mockResolvedValue(undefined);
       const repoStub = { rebuildIndex } as unknown as SearchRepository;
-      const service = new SearchService(repoStub, cache, scan.isScanning);
+      const service = new SearchService(repoStub, cache, {} as unknown as SettingsService, scan.isScanning);
 
       await expect(service.rebuildIndex()).resolves.toBeUndefined();
       expect(rebuildIndex).toHaveBeenCalledTimes(1);

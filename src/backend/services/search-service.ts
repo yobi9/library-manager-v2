@@ -3,6 +3,9 @@ import { normalizeQuery } from "../utils/search-normalizer";
 import { runInWriterContext } from "../db/db";
 import { CacheService } from "./cache-service";
 import { CachePrefixes } from "./cache-prefixes";
+import { SettingsService } from "./settings-service";
+import { resolveBlockedCertifications } from "./content-access-policy";
+import type { AuthContext } from "../api/route-helpers";
 
 /**
  * TTL (بالثواني) لنتائج البحث والاقتراحات الحية (Phase 5).
@@ -32,9 +35,22 @@ export class SearchService {
   constructor(
     private searchRepo: SearchRepository,
     private cache: CacheService,
+    private settingsService: SettingsService,
     /** اختياري: مسند يعيد `true` عند وجود مسح نشط — يرفض إعادة بناء الفهرس حينها. */
     private getIsScanActive?: () => boolean,
   ) {}
+
+  /**
+   * قراءة الإعدادات وتحديد التصنيفات المحظورة للمستخدم الحالي.
+   *
+   * @param auth - سياق المصادقة (null للزائر).
+   * @returns مصفوفة التصنيفات المحظورة (فارغة إذا لا فلترة).
+   */
+  private async getBlockedCertifications(auth?: AuthContext | null): Promise<string[]> {
+    const settings = await this.settingsService.getAllSettings();
+    const filter = resolveBlockedCertifications(auth ?? null, settings);
+    return filter.enabled ? filter.blockedCertifications : [];
+  }
 
   /**
    * Executes a paginated full-text search across all media items.
@@ -58,8 +74,9 @@ export class SearchService {
     year?: number;
     page?: number;
     limit?: number;
+    auth?: AuthContext;
   }) {
-    const { q, type, libraryId, year, page = 1, limit = 20 } = params;
+    const { q, type, libraryId, year, page = 1, limit = 20, auth } = params;
     const normalizedQuery = normalizeQuery(q ?? "");
 
     if (!normalizedQuery) {
@@ -74,15 +91,17 @@ export class SearchService {
 
     return this.cache.withCache(
       CachePrefixes.search,
-      { kind: "search-media", normalizedQuery, type, libraryId, year, page, limit },
+      { kind: "search-media", normalizedQuery, type, libraryId, year, page, limit, auth: auth ? { userId: auth.userId, isAdmin: auth.isAdmin } : null },
       async () => {
         const offset = (page - 1) * limit;
+        const blocked = await this.getBlockedCertifications(auth);
 
         const { results, total } = await this.searchRepo.searchMediaWithCount({
           normalizedQuery,
           type,
           libraryId,
           year,
+          excludeCertifications: blocked.length ? blocked : undefined,
           limit,
           offset,
         });
@@ -163,15 +182,16 @@ export class SearchService {
    * @param limit - Maximum results (default: 8).
    * @returns Array of matching items with display fields.
    */
-  async liveSearch(query: string, limit = 8) {
+  async liveSearch(query: string, limit = 8, auth?: AuthContext) {
     const normalizedQuery = normalizeQuery(query);
     if (!normalizedQuery) return [];
+    const blocked = await this.getBlockedCertifications(auth);
 
     return this.cache.withCache(
       CachePrefixes.search,
-      { type: "live", normalizedQuery, limit },
+      { type: "live", normalizedQuery, limit, blocked },
       async () => {
-        const results = await this.searchRepo.searchMedia(normalizedQuery, limit);
+        const results = await this.searchRepo.searchMedia(normalizedQuery, limit, blocked.length ? blocked : undefined);
         return results.map((r: Record<string, unknown>) => ({
           id: r["media_id"],
           title: r["title"],

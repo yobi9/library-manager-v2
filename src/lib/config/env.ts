@@ -4,9 +4,7 @@ const envSchema = z.object({
   NODE_ENV: z.enum(["development", "production", "test"]),
   NEXT_PUBLIC_APP_URL: z.string().url(),
   JWT_SECRET: z.string().min(16),
-  JWT_EXPIRES_IN: z.string().default("7d"),
   DATABASE_URL: z.string().min(1),
-  CORS_ORIGINS: z.string().min(1),
   LIVE_STREAM_BASE_URL: z.string().url().default("http://localhost:3333"),
   LIVE_CHANNELS_PATH: z.string().default("/mubasher_admin/api/viewer/channels"),
 });
@@ -16,9 +14,7 @@ function parseEnv() {
     NODE_ENV: process.env.NODE_ENV,
     NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
     JWT_SECRET: process.env.JWT_SECRET,
-    JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN,
     DATABASE_URL: process.env.DATABASE_URL,
-    CORS_ORIGINS: process.env.CORS_ORIGINS,
     LIVE_STREAM_BASE_URL: process.env.LIVE_STREAM_BASE_URL,
     LIVE_CHANNELS_PATH: process.env.LIVE_CHANNELS_PATH,
   });
@@ -39,13 +35,6 @@ export function getEnv() {
     _env = parseEnv();
   }
   return _env;
-}
-
-export function getCorsOrigins(): string[] {
-  return getEnv()
-    .CORS_ORIGINS.split(",")
-    .map((o) => o.trim())
-    .filter(Boolean);
 }
 
 /**

@@ -41,6 +41,8 @@ interface DbRuntimeState {
   writerInitializationPromise: Promise<Database> | null;
   /** طابور معاملات SAVEPOINT الحصري (انظر {@link withExclusiveTransaction}). */
   transactionQueue: Promise<void>;
+  /** طابور عمليات الكتابة سريعة الفشل للعملاء (انظر {@link withClientWriteFailFast}). */
+  clientWriteQueue: Promise<void>;
   /** عداد عبارات SQL على اتصال الكاتب (قياس المرحلة 0). */
   scannerDbStatementCount: number;
   /** أزميل سياق اتصال الكاتب. */
@@ -79,6 +81,7 @@ const runtimeState: DbRuntimeState =
     dbContextStore: new AsyncLocalStorage<DbOperationContext | null>(),
     inflightStatements: new Map<string, InflightStatement>(),
     openTransactions: new Map<string, OpenTransaction>(),
+    clientWriteQueue: Promise.resolve(),
   });
 
 /** أزميل سياق اتصال الكاتب الحالي (يُقرأ من الحالة المشتركة). */
@@ -741,6 +744,54 @@ export async function executeWithRetry<T>(
     }
   }
   throw lastError;
+}
+
+/** مهلة انتظار كتابات العملاء (بالملي ثانية) في الوضع سريع الفشل. */
+const CLIENT_WRITE_BUSY_TIMEOUT_MS = 200;
+
+/**
+ * ينفّذ عملية كتابة عميل (مشاهدة/دخول) على الاتصال الرئيسي بوضع "فشل سريع".
+ *
+ * WHY: أثناء مسح قيد التنفيذ يمسك كاتب الماسح قفل كتابة WAL، فكتابة العميل
+ * على الاتصال الرئيسي تنتظر `busy_timeout` الطويل (30000ms) قبل أن تفشل،
+ * مما يجمّد استجابة الطلب. هذا المساعد يخفض `busy_timeout` مؤقتاً إلى
+ * `CLIENT_WRITE_BUSY_TIMEOUT_MS` (200ms) حول العملية فقط ثم يعيده فوراً،
+ * بحيث تنتهي الكتابة إما بنجاح سريع أو برفض سريع بدل الانتظار الطويل —
+ * جزء من خطة العزل 3.5.4.
+ *
+ * يُسلسَل عبر طابور FIFO (`clientWriteQueue`) لأن الاتصال الرئيسي مشترك بين
+ * كل الطلبات: دون تسلسل قد تعيد عملية موازية ضبط `busy_timeout` في وسط كتابة
+ * أخرى. القيم افتراضياً تُقرأ من الإعداد الحالي للاتصال وتُستعاد كما كانت.
+ *
+ * @param fn - عملية الكتابة (تُتوقع أن تستخدم `getDatabase()` فتصل للاتصال الرئيسي).
+ * @returns نتيجة `fn` مهما كان نوعها.
+ * @throws خطأ الكتابة نفسه إذا فشلت (يُرفض سريعاً بدل الانتظار الطويل).
+ */
+export async function withClientWriteFailFast<T>(fn: () => Promise<T>): Promise<T> {
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => (release = resolve));
+  // `clientWriteQueue` قد يكون مفقوداً إذا بقي كائن حالة قديم على globalThis
+  // بعد إعادة تقييم الوحدة (HMR) — نضمن قيماً وعداً دائماً.
+  const queue = runtimeState.clientWriteQueue ?? (runtimeState.clientWriteQueue = Promise.resolve());
+  const previous = queue;
+  runtimeState.clientWriteQueue = previous.then(() => gate);
+  await previous;
+
+  const db = await getDatabase();
+  let previousTimeout = 30000;
+  try {
+    const row = (await db.get("PRAGMA busy_timeout")) as { timeout: number } | undefined;
+    previousTimeout = row?.timeout ?? 30000;
+    await db.run(`PRAGMA busy_timeout = ${CLIENT_WRITE_BUSY_TIMEOUT_MS};`);
+    return await fn();
+  } finally {
+    try {
+      await db.run(`PRAGMA busy_timeout = ${previousTimeout};`);
+    } catch {
+      // تجاهل فشل الاستعادة؛ الاتصال سيُعيد ضبطه عند إعادة الفتح.
+    }
+    release();
+  }
 }
 
 /**

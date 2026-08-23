@@ -29,6 +29,7 @@ import {
   fetchPublicSettings,
   fetchChannels,
 } from "./api-media";
+import { apiFetch } from "./api-client";
 
 export const mediaKeys = {
   all: ["media"] as const,
@@ -57,22 +58,39 @@ export function useMediaByFilter(params: {
 }
 
 /**
- * Infinite-scroll variant of `useMediaByFilter`: appends extra pages of results
- * on demand via `fetchNextPage` (driven by an IntersectionObserver in the UI).
- * Page and limit are managed internally.
+ * خيارات التحكم بحجم الصفحات في التحميل اللانهائي.
+ */
+interface InfiniteMediaFilterOptions {
+  /** عدد العناصر في الصفحة الأولى (القيمة الافتراضية 30). */
+  initialLimit?: number;
+  /** عدد العناصر في كل صفحة بعدها (القيمة الافتراضية 7). */
+  subsequentLimit?: number;
+}
+
+/**
+ * استعلام لانهائي لجلب العناصر حسب الفلتر: الصفحة الأولى تحمل عدد أكبر،
+ * و كل صفحة بعدها تحمل عدد أقل لتحسين أداء التمرير.
  *
- * @param params - Base filter params (`page`/`limit` are overridden internally).
- * @param limit - Items per page (default 30).
- * @returns Flattened `allItems`, `total`, pagination state, and `fetchNextPage`.
+ * الصفحة الأولى تستخدم `initialLimit`، و كل صفحة بعدها تستخدم `subsequentLimit`.
+ *
+ * @param params - معاملات الفلتر (يتم تجاوز `page`/`limit` داخلياً).
+ * @param options - خيارات حجم الصفحة: `initialLimit` (24) و `subsequentLimit` (7).
+ * @returns جميع العناصر، العدد الكلي، حالة التمرير، و `fetchNextPage`.
  */
 export function useInfiniteMediaByFilter(
   params: Omit<MediaFilterParams, "page" | "limit">,
-  limit = 30,
+  options?: InfiniteMediaFilterOptions,
 ) {
+  const initialLimit = options?.initialLimit ?? 24;
+  const subsequentLimit = options?.subsequentLimit ?? 7;
+
   return useInfiniteQuery({
-    queryKey: [...mediaKeys.filter(params as Record<string, unknown>), "infinite", limit],
+    queryKey: [...mediaKeys.filter(params as Record<string, unknown>), "infinite", initialLimit, subsequentLimit],
     initialPageParam: 1,
-    queryFn: ({ pageParam }) => fetchMediaByFilter({ ...params, page: pageParam, limit }),
+    queryFn: ({ pageParam }) => {
+      const limit = pageParam === 1 ? initialLimit : subsequentLimit;
+      return fetchMediaByFilter({ ...params, page: pageParam, limit });
+    },
     getNextPageParam: (lastPage, allPages) => {
       if (lastPage.hasMore === false) return undefined;
       const loaded = allPages.reduce((sum, page) => sum + page.items.length, 0);
@@ -85,19 +103,19 @@ export function useInfiniteMediaByFilter(
 }
 
 export function useMediaByYear(year: number, page = 1) {
-  return useMediaByFilter({ year, page, limit: 30, rootOnly: true });
+  return useMediaByFilter({ year, page, limit: 24, rootOnly: true });
 }
 
 export function useMediaByGenre(genre: string, page = 1) {
-  return useMediaByFilter({ genre, page, limit: 30, rootOnly: true });
+  return useMediaByFilter({ genre, page, limit: 24, rootOnly: true });
 }
 
 export function useMediaByRating(rating: number, page = 1) {
-  return useMediaByFilter({ minRating: rating, page, limit: 30, rootOnly: true });
+  return useMediaByFilter({ minRating: rating, page, limit: 24, rootOnly: true });
 }
 
 export function useMediaByCertification(certification: string, page = 1) {
-  return useMediaByFilter({ certification, page, limit: 30, rootOnly: true });
+  return useMediaByFilter({ certification, page, limit: 24, rootOnly: true });
 }
 
 export function useAvailableYears(libraryId?: number) {
@@ -125,6 +143,29 @@ export function useLibraryInfo(libraryId: number) {
   });
 }
 
+/**
+ * خيارات التحكم بحجم الصفحات في تحميل أيتمات المكتبة.
+ */
+interface LibraryItemsOptions {
+  /** عدد العناصر في الصفحة الأولى (القيمة الافتراضية 24). */
+  initialLimit?: number;
+  /** عدد العناصر في كل صفحة بعدها (القيمة الافتراضية 7). */
+  subsequentLimit?: number;
+}
+
+/**
+ * استعلام لانهائي لجلب أيتمات مكتبة معيّنة مع دعم البحث والفلترة.
+ *
+ * الصفحة الأولى تحمل `initialLimit` عنصر، و كل صفحة بعدها تحمل `subsequentLimit`.
+ * يستخدم ترقيم المؤشر (keyset) عبر `pagination.nextCursor` المعاد من الخادم:
+ * الصفحات اللاحقة ترسل رمز المؤشر بدل offset، فلا تتأثر بالنوافذ عند إدراج
+ * أو حذف عناصر أثناء التمرير (كان سبب التكرارات والفراغات سابقاً).
+ *
+ * @param libraryId - معرّف المكتبة. لا يعمل بدونه.
+ * @param filters - فلاتر البحث والفرز والتصنيف.
+ * @param options - خيارات حجم الصفحة: `initialLimit` (24) و `subsequentLimit` (7).
+ * @returns جميع العناصر، العدد الكلي، حالة التمرير، و `fetchNextPage`.
+ */
 export function useLibraryItems(
   libraryId: number | undefined,
   filters: {
@@ -134,22 +175,27 @@ export function useLibraryItems(
     certification: string;
     sortBy: string;
   },
+  options?: LibraryItemsOptions,
 ) {
+  const initialLimit = options?.initialLimit ?? 24;
+  const subsequentLimit = options?.subsequentLimit ?? 7;
+
   const {
     data,
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
-    isLoading, // ← مستخرج حديثاً
-    isError, // ← مستخرج حديثاً
-    error, // ← مستخرج حديثاً
+    isLoading,
+    isError,
+    error,
   } = useInfiniteQuery({
-    queryKey: mediaKeys.libraryMedia(libraryId ?? 0, filters),
-    initialPageParam: 0,
+    queryKey: mediaKeys.libraryMedia(libraryId ?? 0, { ...filters, _il: initialLimit, _sl: subsequentLimit }),
+    initialPageParam: null as string | null,
     queryFn: async ({ pageParam }) => {
+      const limit = pageParam === null ? initialLimit : subsequentLimit;
       const result = await fetchLibraryMedia(libraryId!, {
-        offset: pageParam,
-        limit: 24,
+        ...(pageParam !== null && { cursor: pageParam }),
+        limit,
         sortBy: filters.sortBy,
         sortOrder: filters.sortBy === "alpha" ? "ASC" : "DESC",
         rootOnly: "true",
@@ -162,13 +208,15 @@ export function useLibraryItems(
       const media = result?.items ?? result?.media ?? result?.data ?? [];
       const total = result?.pagination?.total ?? result?.total ?? 0;
       const hasMore = result?.pagination?.hasMore ?? result?.hasMore ?? false;
-
-      return { media, total, hasMore };
+      return {
+        media,
+        total,
+        hasMore,
+        /** رمز الصفحة التالية (keyset) — null يعني النهاية. */
+        cursor: result?.pagination?.nextCursor ?? null,
+      };
     },
-    getNextPageParam: (lastPage, _allPages, lastPageParam) => {
-      if (!lastPage.hasMore) return undefined;
-      return (lastPageParam as number) + lastPage.media.length;
-    },
+    getNextPageParam: (lastPage) => lastPage.cursor ?? undefined,
     enabled: !!libraryId,
     placeholderData: keepPreviousData, // ← إضافة لمنع فقدان البيانات
   });
@@ -313,15 +361,11 @@ export function useVideoCheck(id: string | number | undefined) {
   return useQuery({
     queryKey: ["media", "videoCheck", id],
     queryFn: async (): Promise<VideoCheckResponse> => {
-      const res = await fetch(`/api/media/${id}/check`);
-      if (!res.ok) {
-        throw new Error(`تعذر التحقق من الفيديو (HTTP ${res.status})`);
-      }
-      const body = (await res.json()) as { success: boolean; data?: VideoCheckResponse };
-      if (!body.data) {
+      const res = await apiFetch<VideoCheckResponse>(`/api/media/${id}/check`);
+      if (!res.success || !res.data) {
         throw new Error("استجابة غير صالحة من الخادم");
       }
-      return body.data;
+      return res.data;
     },
     enabled: !!id,
     staleTime: 60 * 1000,

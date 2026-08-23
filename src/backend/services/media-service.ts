@@ -2,12 +2,20 @@ import { MediaRepository, MERGABLE_ROOT_TYPES } from "../repositories/media-repo
 import { LibraryRepository } from "../repositories/library-repository";
 import { ActivityRepository } from "../repositories/activity-repository";
 import { SearchRepository } from "../repositories/search-repository";
+import { SettingsService } from "./settings-service";
 import fs from "fs/promises";
 import path from "path";
 import { getEventBus } from "./event-bus";
 import { CacheService } from "./cache-service";
 import { CachePrefixes } from "./cache-prefixes";
 import { traceGenresHealth } from "../observability/genres-trace";
+import {
+  buildMediaListScope,
+  getPaginationSkewTracker,
+  type MediaListTraceOptions,
+} from "../observability/pagination-trace";
+import { resolveBlockedCertifications, shouldBlockMedia } from "./content-access-policy";
+import type { AuthContext } from "../api/route-helpers";
 import {
   CREW_ROLE_PRIORITY,
   ESSENTIAL_CREW_ROLES,
@@ -22,6 +30,48 @@ function processMediaItem(item: Record<string, unknown>) {
     result["imdb_rating"] = Number(item["imdb_rating"]);
   }
   return result;
+}
+
+/**
+ * يمرر صفحة قائمة مخدومة إلى متتبع انحراف لقطة الترقيم (تطوير فقط).
+ *
+ * @remarks تُستدعى بعد الحل من الكاش لتشمل الإصابات والطزاجة معاً؛ تستخرج
+ *          حقول الترقية ومعرّفي أول/آخر عنصر دفاعياً من الاستجابة، ولا تفعل
+ *          شيئاً إذا غابت `pagination.total` (استجابة غير متوقعة الشكل).
+ *          لا أثر في الإنتاج لأن المتتبع يتوقف عند `logger.enabled === false`.
+ *
+ * @param libraryId - معرف المكتبة صاحبة القائمة.
+ * @param options - خيارات القائمة كما وردت للخدمة (تدخل بصمة الهوية).
+ * @param blockedCertificationsCount - عدد التصنيفات المحظورة المطبقة.
+ * @param result - استجابة `getLibraryMedia` كما عادت من الكاش.
+ */
+function tracePaginationPage(
+  libraryId: number,
+  options: MediaListTraceOptions,
+  blockedCertificationsCount: number,
+  result: unknown,
+): void {
+  const pagination = (
+    result as { pagination?: { total?: unknown; offset?: unknown } } | null | undefined
+  )?.pagination;
+  if (!pagination || typeof pagination.total !== "number") return;
+
+  const items =
+    (result as { items?: Array<Record<string, unknown>> | undefined }).items ?? [];
+  const idOf = (item: Record<string, unknown> | undefined): number | null => {
+    const id = item?.["media_id"] ?? item?.["id"];
+    return typeof id === "number" ? id : null;
+  };
+
+  getPaginationSkewTracker().observePage({
+    libraryId,
+    scope: buildMediaListScope(options, blockedCertificationsCount),
+    offset: typeof pagination.offset === "number" ? pagination.offset : 0,
+    total: pagination.total,
+    count: items.length,
+    firstId: idOf(items[0]),
+    lastId: idOf(items.at(-1)),
+  });
 }
 
 /**
@@ -56,9 +106,22 @@ export class MediaService {
     private mediaRepo: MediaRepository,
     private libraryRepo: LibraryRepository,
     private cache: CacheService,
+    private settingsService: SettingsService,
     private activityRepo?: ActivityRepository,
     private searchRepo?: SearchRepository,
   ) {}
+
+  /**
+   * قراءة الإعدادات وتحديد التصنيفات المحظورة للمستخدم الحالي.
+   *
+   * @param auth - سياق المصادقة (null للزائر).
+   * @returns مصفوفة التصنيفات المحظورة (فارغة إذا لا فلترة).
+   */
+  private async getBlockedCertifications(auth?: AuthContext | null): Promise<string[]> {
+    const settings = await this.settingsService.getAllSettings();
+    const filter = resolveBlockedCertifications(auth ?? null, settings);
+    return filter.enabled ? filter.blockedCertifications : [];
+  }
 
   /**
    * Retrieves a single media item by its ID, including its children (e.g., seasons of a series),
@@ -70,13 +133,16 @@ export class MediaService {
    *          and `crew` (every non-actor person), or `null` if not found.
    *          Each child is processed through `processMediaItem`.
    */
-  async getMediaById(id: number) {
+  async getMediaById(id: number, auth?: AuthContext) {
     return this.cache.withCache(
       CachePrefixes.mediaDetail,
-      { id },
+      { id, auth: auth ? { userId: auth.userId, isAdmin: auth.isAdmin } : undefined },
       async () => {
         const media = (await this.mediaRepo.getById(id)) as Record<string, unknown> | undefined;
         if (!media) return null;
+        const settings = await this.settingsService.getAllSettings();
+        const certFilter = resolveBlockedCertifications(auth ?? null, settings);
+        if (shouldBlockMedia(media["certification"] as string | null | undefined, certFilter)) return null;
         const processed = processMediaItem(media);
         const isRootMergable =
           media["parent_media_id"] == null && MERGABLE_ROOT_TYPES.has(media["type"] as string);
@@ -198,9 +264,10 @@ export class MediaService {
     );
   }
 
-  async getMediaBatch(ids: number[]) {
+  async getMediaBatch(ids: number[], auth?: AuthContext) {
     if (!ids.length) return [];
-    const items = (await this.mediaRepo.batchGetByIds(ids)) as Record<string, unknown>[];
+    const blocked = await this.getBlockedCertifications(auth);
+    const items = (await this.mediaRepo.batchGetByIds(ids, blocked.length ? blocked : undefined)) as Record<string, unknown>[];
     const libIds = [...new Set(items.map((m) => m["library_id"]).filter(Boolean))] as (
       string | number
     )[];
@@ -220,6 +287,26 @@ export class MediaService {
     return mapped;
   }
 
+  /**
+   * يجلب قائمة وسائط مكتبة مع ترقيم صفحات وفلترة، عبر الكاش (TTL 60ث).
+   *
+   * @remarks بعد الحل من الكاش (إصابة أو طزاجة) تُمرَّر الاستجابة إلى
+   *          متتبع انحراف لقطة الترقيم (`pagination-trace`) الذي يسجّل
+   *          حدثاً تطويرياً لكل صفحة مخدومة ويحذّر عند اختلاف إجمالي
+   *          القائمة بين الصفحات داخل جلسة واحدة — فئة الفشل الصامتة
+   *          في OFFSET pagination فوق بيانات متغيّرة أثناء المسح.
+   *
+   * @param libraryId - معرف المكتبة المطلوب عناصرها.
+   * @param options - خيارات القائمة (ترقيم، ترتيب، فلاتر سنة/نوع/تصنيف/بحث).
+   * @param options.cursor - رمز keyset من صفحة سابقة؛ عند وجوده يُبنى الرد بوضع
+   *        المؤشر: pagination {total, limit, hasMore, nextCursor} بلا offset،
+   *        محصّناً ضد انزياح النوافذ عند الإدراج أثناء التمرير. غيابه يحفظ
+   *        عقد OFFSET القديم كما هو للتوافق.
+   * @param auth - سياق المصادقة (null للزائر) لتطبيق التصنيفات المحظورة.
+   * @returns استجابة موحدة: `success`, `library`, `items`, `pagination`
+   *          {total, offset, limit, hasMore} في وضع OFFSET أو
+   *          {total, limit, hasMore, nextCursor} في وضع المؤشر.
+   */
   async getLibraryMedia(
     libraryId: number,
     options: {
@@ -228,15 +315,18 @@ export class MediaService {
       sortOrder?: string;
       limit?: number;
       offset?: number;
+      cursor?: string;
       year?: string;
       genre?: string;
       certification?: string;
       search?: string;
     } = {},
+    auth?: AuthContext,
   ) {
-    return this.cache.withCache(
+    const blocked = await this.getBlockedCertifications(auth);
+    const result = await this.cache.withCache(
       CachePrefixes.media,
-      { type: "library-media", libraryId, options },
+      { type: "library-media", libraryId, options, blocked },
       async () => {
         const library = (await this.libraryRepo.getById(libraryId)) as
           Record<string, unknown> | undefined;
@@ -245,10 +335,33 @@ export class MediaService {
         const limit = options.limit ?? 50;
         const offset = options.offset ?? 0;
 
-        const { items, total } = await this.mediaRepo.getLibraryMediaFiltered(libraryId, options);
+        const repoResult = await this.mediaRepo.getLibraryMediaFiltered(libraryId, {
+          ...options,
+          excludeCertifications: blocked.length ? blocked : undefined,
+        });
 
-        const mappedItems = items.map(processMediaItem);
+        const mappedItems = repoResult.items.map(processMediaItem);
         traceGenresHealth("service:getLibraryMedia", mappedItems);
+
+        // وضع المؤشر: hasMore يأتي محسوباً من الجلب الزائد (limit+1) في الـrepo
+        // والمؤشر التالي مرمّز من آخر صف — لا يعتمدان على offset ولا على total.
+        if (options.cursor) {
+          return {
+            success: true,
+            library: {
+              id: library["library_id"],
+              name: library["name"],
+              type: library["type"],
+            },
+            items: mappedItems,
+            pagination: {
+              total: repoResult.total,
+              limit,
+              hasMore: repoResult.hasMore ?? false,
+              nextCursor: repoResult.nextCursor ?? null,
+            },
+          };
+        }
 
         return {
           success: true,
@@ -259,23 +372,30 @@ export class MediaService {
           },
           items: mappedItems,
           pagination: {
-            total,
+            total: repoResult.total,
             offset,
             limit,
-            hasMore: offset + items.length < total,
+            hasMore: offset + repoResult.items.length < repoResult.total,
+            // يُصدر من الـrepo في الفرعين متى وُجدت صفحة تالية، ليبدأ التمرير
+            // اللانهائي بالكامل على keyset من الصفحة الثانية فصاعداً.
+            nextCursor: repoResult.nextCursor ?? null,
           },
         };
       },
       MEDIA_LIST_CACHE_TTL_SECONDS,
     );
+
+    tracePaginationPage(libraryId, options, blocked.length, result);
+    return result;
   }
 
-  async getLatestItems(type?: string, limit = 24) {
+  async getLatestItems(type?: string, limit = 24, auth?: AuthContext) {
+    const blocked = await this.getBlockedCertifications(auth);
     return this.cache.withCache(
       CachePrefixes.media,
-      { type: "latest", mediaType: type ?? "all", limit },
+      { type: "latest", mediaType: type ?? "all", limit, blocked },
       async () => {
-        const items = (await this.mediaRepo.getLatestMedia(type, limit)) as Record<
+        const items = (await this.mediaRepo.getLatestMedia(type, limit, blocked)) as Record<
           string,
           unknown
         >[];
@@ -287,12 +407,13 @@ export class MediaService {
     );
   }
 
-  async getPinnedItems() {
+  async getPinnedItems(auth?: AuthContext) {
+    const blocked = await this.getBlockedCertifications(auth);
     return this.cache.withCache(
       CachePrefixes.media,
-      { type: "pinned" },
+      { type: "pinned", blocked },
       async () => {
-        const items = (await this.mediaRepo.getPinnedItems()) as Record<string, unknown>[];
+        const items = (await this.mediaRepo.getPinnedItems(blocked)) as Record<string, unknown>[];
         const mapped = items.map(processMediaItem);
         traceGenresHealth("service:getPinnedItems", mapped);
         return mapped;
@@ -353,16 +474,18 @@ export class MediaService {
     return (row?.["title"] as string | null) ?? null;
   }
 
-  async getRecommendations(mediaId: number, libraryId: number, type?: string, limit = 20) {
+  async getRecommendations(mediaId: number, libraryId: number, type?: string, limit = 20, auth?: AuthContext) {
+    const blocked = await this.getBlockedCertifications(auth);
     return this.cache.withCache(
       CachePrefixes.recommendations,
-      { mediaId, libraryId, mediaType: type ?? "all", limit },
+      { mediaId, libraryId, mediaType: type ?? "all", limit, blocked },
       async () => {
         const items = (await this.mediaRepo.getRecommendations(
           mediaId,
           libraryId,
           type,
           limit,
+          blocked,
         )) as Record<string, unknown>[];
         const mapped = items.map(processMediaItem);
         traceGenresHealth("service:getRecommendations", mapped);
@@ -443,12 +566,16 @@ export class MediaService {
     excludeTypes?: string[];
     page?: number;
     limit?: number;
-  }) {
+  }, auth?: AuthContext) {
+    const blocked = await this.getBlockedCertifications(auth);
     return this.cache.withCache(
       CachePrefixes.media,
-      { type: "filter", params },
+      { type: "filter", params, blocked },
       async () => {
-        const result = await this.mediaRepo.getMediaByFilter(params);
+        const result = await this.mediaRepo.getMediaByFilter({
+          ...params,
+          excludeCertifications: blocked.length ? blocked : undefined,
+        });
 
         // معالجة العناصر لدمج enriched في poster_path/backdrop_path إذا كانت فارغة
         const processedItems = (result.items as Record<string, unknown>[]).map((item) => {
@@ -592,10 +719,11 @@ export class MediaService {
     return result;
   }
 
-  async getMediaChildren(parentId: number) {
+  async getMediaChildren(parentId: number, auth?: AuthContext) {
+    const blocked = await this.getBlockedCertifications(auth);
     return this.cache.withCache(
       CachePrefixes.mediaDetail,
-      { type: "children", parentId },
+      { type: "children", parentId, blocked },
       async () => {
         const items = await this.mediaRepo.getMediaChildren(parentId);
         return (items as Record<string, unknown>[]).map(processMediaItem);
@@ -604,9 +732,12 @@ export class MediaService {
     );
   }
 
-  async getStreamInfo(mediaId: number) {
+  async getStreamInfo(mediaId: number, auth?: AuthContext) {
     const media = (await this.mediaRepo.getById(mediaId)) as Record<string, unknown> | undefined;
     if (!media) return null;
+    const settings = await this.settingsService.getAllSettings();
+    const certFilter = resolveBlockedCertifications(auth ?? null, settings);
+    if (shouldBlockMedia(media["certification"] as string | null | undefined, certFilter)) return null;
 
     const files = (await this.mediaRepo.getMediaFiles(mediaId)) as Record<string, unknown>[];
     if (!files.length) return null;
@@ -641,12 +772,13 @@ export class MediaService {
     );
   }
 
-  async getPersonWorks(personId: number) {
+  async getPersonWorks(personId: number, auth?: AuthContext) {
+    const blocked = await this.getBlockedCertifications(auth);
     return this.cache.withCache(
       CachePrefixes.catalog,
-      { kind: "person-works", personId },
+      { kind: "person-works", personId, blocked },
       async () => {
-        const works = (await this.mediaRepo.getPersonWorks(personId)) as Record<string, unknown>[];
+        const works = (await this.mediaRepo.getPersonWorks(personId, blocked.length ? blocked : undefined)) as Record<string, unknown>[];
         const mapped = works.map(processMediaItem);
         traceGenresHealth("service:getPersonWorks", mapped);
         return mapped;

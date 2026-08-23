@@ -2,8 +2,6 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { EnrichmentController } from "@/backend/controllers/enrichment-controller";
 import { TmdbEnrichmentService } from "@/backend/services/tmdb-enrichment-service";
 import { MetadataService } from "@/backend/services/metadata-service";
-import { EnrichmentMediaRepository } from "@/backend/repositories/enrichment-media-repository";
-import { EnrichmentApprovalRepository } from "@/backend/repositories/enrichment-repository";
 
 /**
  * اختبار حارس SSRF في مسار رفع الصورة على مستوى الـ Controller.
@@ -24,8 +22,6 @@ describe("EnrichmentController.uploadImageFromUrl (SSRF)", () => {
     controller = new EnrichmentController(
       serviceStub,
       {} as unknown as MetadataService,
-      {} as unknown as EnrichmentMediaRepository,
-      {} as unknown as EnrichmentApprovalRepository,
     );
   });
 

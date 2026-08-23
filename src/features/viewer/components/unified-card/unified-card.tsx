@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Play, LinkIcon, Clock, Eye } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/shared/components/ui/badge";
+import { Button } from "@/shared/components/ui/button";
 import { buildMediaUrl } from "@/lib/frontend/media-helpers";
 import { translateMediaType, formatDuration, formatViews } from "@/lib/frontend/translate";
 
@@ -21,6 +22,7 @@ export interface UnifiedCardProps {
   mediaType?: string;
   mediaId?: number | string;
   views?: number;
+  votes?: number;
   certification?: string;
   duration?: number | string;
   iconVariant?: "play" | "link";
@@ -51,6 +53,7 @@ export function UnifiedCard({
   href,
   mediaType,
   views,
+  votes,
   certification: ageRating,
   duration,
   iconVariant = "link",
@@ -95,8 +98,7 @@ export function UnifiedCard({
   const cardContent = (
     <>
       {imageUrl ? (
-        // <div className="bg-muted border-border/60 shadow-card group-hover:border-primary/40 group-hover:shadow-hover relative aspect-2/3 overflow-hidden rounded-lg border transition-all duration-300">
-        <div className="bg-muted border-border/60 shadow-card group-hover:border-purple-500 group-hover:shadow-[0_0_15px_rgba(168,85,247,0.5)] dark:group-hover:border-purple-700 dark:group-hover:shadow-purple-500/30 relative aspect-2/3 overflow-hidden rounded-lg border transition-all duration-300">
+        <div className="bg-muted border-border/60 shadow-card group-hover:shadow-hover group-hover:border-border-hover group-hover:border-2 relative aspect-2/3 overflow-hidden rounded-lg border transition-all duration-500 ease-in-out">
           <img
             src={imageUrl}
             alt={title}
@@ -104,15 +106,20 @@ export function UnifiedCard({
             loading={priority ? "eager" : "lazy"}
           />
 
+          {/* لمعة سينمائية فوق البوستر — تظهر عند التحويم */}
+          <div
+            className="pointer-events-none absolute inset-0 z-10 opacity-0 transition-opacity duration-500 group-hover:opacity-100"
+            style={{ backgroundImage: "var(--poster-sheen)" }}
+            aria-hidden="true"
+          />
+
           <div className="absolute inset-e-1.5 top-1.5 z-40">
             {isNew ? (
-              <Badge className="bg-green-600 text-[10px] text-white">جديد</Badge>
+              <Badge variant="new" className="text-[12px]">جديد</Badge>
             ) : (
               genresList.length > 0 && (
-                <Badge
-                  variant="outline"
-                  className="border-white/30 bg-black/60 text-[10px] text-white backdrop-blur-sm"
-                >
+                <Badge variant="genre" className="text-[10px]">
+
                   {genresList[0]}
                 </Badge>
               )
@@ -120,35 +127,38 @@ export function UnifiedCard({
           </div>
 
           {formattedRating && (
-            <Badge className="absolute inset-s-1.5 top-1.5 z-40 bg-yellow-500 text-[10px] text-white shadow-sm">
-              ★ {formattedRating}
+            <Badge variant="rating" className="absolute inset-s-1.5 top-1.5 z-40 border-0 px-1.5  text-[10px] shadow-sm">
+             
+                {/* text-xs للهواتف، وتكبر إلى sm:text-sm للشاشات الأكبر */}
+             <span className="text-rating-star text-xs sm:text-sm leading-none">★</span> {formattedRating}
+  
             </Badge>
           )}
 
-          <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-linear-to-b from-black/80 via-black/50 to-black/85 p-3 opacity-0 transition-opacity duration-300 group-hover:opacity-100 sm:p-4">
-            <div
-              className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border-2 border-yellow-500/50 bg-yellow-500/20 shadow-lg transition-all duration-300 hover:scale-110 hover:border-yellow-500 hover:bg-yellow-500/60 sm:h-10 sm:w-10"
+          <div className="from-overlay-scrim/80 via-overlay-scrim/50 to-overlay-scrim/85 absolute inset-0 z-30 flex flex-col items-center justify-center bg-linear-to-b p-3 opacity-0 transition-opacity duration-300 group-hover:opacity-100 sm:p-4">
+            <Button
+              variant="glass-play"
+              size="icon"
+              className="hover:scale-110"
               onClick={handlePlayClick}
-              role="button"
-              tabIndex={0}
               aria-label={iconVariant === "link" ? "فتح الرابط" : "تشغيل"}
             >
               {iconVariant === "link" ? (
-                <LinkIcon size={14} className="text-white" />
+                <LinkIcon size={14} />
               ) : (
-                <Play size={14} className="fill-current text-white" />
+                <Play size={14} className="fill-current" />
               )}
-            </div>
+            </Button>
 
-            <div className="absolute right-0 bottom-1 left-0 flex flex-col items-center gap-0.5 border-t border-white/10 bg-black/60 px-1.5 py-1 backdrop-blur-sm sm:px-2 sm:py-1.5">
+            <div className="border-overlay-chip/10 bg-overlay-scrim/60 absolute right-0 bottom-1 left-0 flex flex-col items-center gap-0.5 border-t px-1.5 py-1 backdrop-blur-sm sm:px-2 sm:py-1.5">
               <div className="flex items-center gap-1 sm:gap-1.5">
                 {typeLabel && (
-                  <span className="rounded-sm border border-white/20 bg-black/70 px-1.5 py-0.5 text-[9px] font-bold text-white shadow-md backdrop-blur-sm sm:px-2 sm:text-[10px]">
+                  <span className="border-chip-border bg-chip-bg text-chip-fg rounded-sm border px-1.5 py-0.5 text-[9px] font-bold shadow-md backdrop-blur-sm sm:px-2 sm:text-[10px]">
                     {typeLabel}
                   </span>
                 )}
                 {formattedCert && (
-                  <span className="rounded-sm border border-white/20 bg-black/70 px-1.5 py-0.5 text-[9px] font-bold text-white shadow-md backdrop-blur-sm sm:px-2 sm:text-[10px]">
+                  <span className="border-chip-border bg-chip-bg text-chip-fg rounded-sm border px-1.5 py-0.5 text-[9px] font-bold shadow-md backdrop-blur-sm sm:px-2 sm:text-[10px]">
                     {formattedCert}
                   </span>
                 )}
@@ -159,13 +169,13 @@ export function UnifiedCard({
                   {genresList.slice(0, 2).map((genre, idx) => (
                     <span
                       key={idx}
-                      className="rounded-sm border border-white/20 bg-black/70 px-1 py-0.5 text-[8px] font-bold text-white backdrop-blur-sm sm:px-1.5 sm:text-[10px]"
+                      className="border-chip-border bg-chip-bg text-chip-fg rounded-sm border px-1 py-0.5 text-[8px] font-bold backdrop-blur-sm sm:px-1.5 sm:text-[10px]"
                     >
                       {genre}
                     </span>
                   ))}
                   {genresList.length > 2 && (
-                    <span className="self-center rounded-sm border border-white/20 bg-black/70 px-1 py-0.5 text-[8px] font-bold text-white/80 backdrop-blur-sm sm:px-1.5 sm:text-[10px]">
+                    <span className="border-chip-border bg-chip-bg text-chip-fg/80 self-center rounded-sm border px-1 py-0.5 text-[8px] font-bold backdrop-blur-sm sm:px-1.5 sm:text-[10px]">
                       +{genresList.length - 2}
                     </span>
                   )}
@@ -175,59 +185,55 @@ export function UnifiedCard({
           </div>
         </div>
       ) : (
-        <div className="from-card to-card/50 group-hover:border-primary/50 border-border/60 shadow-card group-hover:shadow-hover relative flex aspect-2/3 flex-col items-center justify-center gap-1.5 overflow-hidden rounded-lg border bg-linear-to-br transition-all duration-300 sm:gap-2">
-          <div
-            className="bg-primary/20 border-primary/40 flex h-10 w-10 items-center justify-center rounded-xl border transition-all duration-300 sm:h-12 sm:w-12"
-            role="button"
-            tabIndex={0}
+        <div className="from-card to-card/50 border-border/60 shadow-card group-hover:shadow-hover group-hover:border-border-hover group-hover:border-2 relative flex aspect-2/3 flex-col items-center justify-center gap-1.5 overflow-hidden rounded-lg border bg-linear-to-br transition-all duration-500 ease-in-out sm:gap-2">
+          <Button
+            variant="outline"
+            size="icon"
+            className="border-primary/40 bg-primary/20 rounded-xl hover:bg-primary/30 sm:h-12 sm:w-12"
             aria-label={iconVariant === "link" ? "فتح الرابط" : "تشغيل"}
           >
             {iconVariant === "link" ? (
-              <LinkIcon size={16} className="text-white" />
+              <LinkIcon size={16} className="text-foreground" />
             ) : (
-              <Play size={16} className="translate-x-0.5 fill-current text-white" />
+              <Play size={16} className="text-foreground translate-x-0.5 fill-current" />
             )}
-          </div>
+          </Button>
           <span className="text-foreground/50 line-clamp-1 px-1.5 text-center text-[9px] font-bold sm:px-2 sm:text-[10px]">
             {title}
           </span>
         </div>
       )}
 
-      <div className="pt-1 sm:pt-1.5">
-        <h3 className="text-foreground group-hover:text-foreground line-clamp-1 text-[10px] font-bold transition-colors sm:text-xs">
+      <div className="pt-1 sm:pt-1.5 mt-1.5  ">
+        <h3 className="text-foreground group-hover:text-foreground line-clamp-1 text-[10px] font-bold transition-colors sm:text-xs"   dir="auto">
           {title}
         </h3>
-        <div className="text-muted-foreground mt-0.5 flex items-center justify-between text-[10px] font-bold sm:text-xs">
-          <div className="flex items-center gap-1 sm:gap-1.5">
-            {year && <span>{year}</span>}
-            {duration && (
-              <span className="border-border/20 flex items-center gap-0.5 border-s ps-1 sm:gap-1 sm:ps-1.5">
-                <Clock size={8} className="sm:h-2.5 sm:w-2.5" />{" "}
-                {typeof duration === "number" ? formatDuration(duration) : duration}
-              </span>
-            )}
-          </div>
-          {views !== undefined && views > 0 && (
-            <span className="flex items-center gap-0.5">
-              <Eye size={8} className="sm:h-2.5 sm:w-2.5" /> {formatViews(views)}
-            </span>
-          )}
-        </div>
+    
+<div className="text-muted-foreground mt-1.5 flex items-center justify-between text-[10px] font-bold sm:text-xs">
+    {views !== undefined && views > 0 && (
+      <span className="flex items-center gap-0.5 text-icon-subtle">
+        <Eye size={8} className="sm:h-2.5 sm:w-2.5" /> {formatViews(views)}
+     </span>
+    )}
+ <span className="text-text-subtle">{year || "[السنة]"}</span>
+  </div>
+     
+      
       </div>
     </>
   );
 
   const wrapperClasses = cn(
-    "group relative w-full mx-auto max-w-full",
+    "group relative w-full mx-auto max-w-full ", 
     onClick && "cursor-pointer",
     className,
   );
 
-const cardClasses = cn(
-  "bg-transparent border border-transparent rounded-lg transition-all duration-300 overflow-hidden",
-  isSelected && "ring-4 ring-ring ring-offset-2 ring-offset-background shadow-lg shadow-ring/25 scale-[1.02]"
-);
+  const cardClasses = cn(
+    "bg-transparent border border-transparent rounded-lg transition-all duration-300 overflow-hidden",
+    isSelected &&
+      "ring-4 ring-ring ring-offset-2 ring-offset-background shadow-lg shadow-ring/25 scale-[1.02]",
+  );
   if (resolvedHref) {
     return (
       <div className={wrapperClasses}>

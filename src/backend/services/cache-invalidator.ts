@@ -44,7 +44,7 @@ const isSuccessfulEnrichment = (data: unknown): boolean =>
 const EVENT_PREFIX_MAP: readonly EventToPrefixMapping[] = [
   {
     event: "settings_updated",
-    prefixes: [CachePrefixes.settings],
+    prefixes: [CachePrefixes.settings, CachePrefixes.media, CachePrefixes.catalog, CachePrefixes.search],
   },
   {
     event: "media_updated",

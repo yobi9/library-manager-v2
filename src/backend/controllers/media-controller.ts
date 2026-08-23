@@ -1,6 +1,8 @@
 import { BaseController, type RequestContext } from "./base-controller";
 import type { MediaService } from "../services/media-service";
 import type { ViewService, ViewerContext } from "../services/view-service";
+import type { AuthContext } from "../api/route-helpers";
+import { MediaListCursorError } from "../repositories/media-repository";
 
 export class MediaController extends BaseController {
   constructor(
@@ -10,10 +12,10 @@ export class MediaController extends BaseController {
     super();
   }
 
-  async getMediaById(id: string) {
+  async getMediaById(id: string, auth?: AuthContext) {
     try {
       const mediaId = this.parseId(id);
-      const media = await this.mediaService.getMediaById(mediaId);
+      const media = await this.mediaService.getMediaById(mediaId, auth);
       if (!media) return this.notFound("Media not found");
       return this.ok(media);
     } catch (err) {
@@ -21,17 +23,27 @@ export class MediaController extends BaseController {
     }
   }
 
-  async getLatest(type?: string, limitStr?: string) {
+  async getLatest(type?: string, limitStr?: string, auth?: AuthContext) {
     try {
       const limit = this.parseLimit(limitStr, 24);
-      const items = await this.mediaService.getLatestItems(type, limit);
+      const items = await this.mediaService.getLatestItems(type, limit, auth);
       return this.ok(items);
     } catch (err) {
       return this.handleError(err);
     }
   }
 
-  async getLibraryMedia(libraryId: string, params: Record<string, string>) {
+  /**
+   * GET قائمة وسائط مكتبة — يبني خيارات الاستعلام من معاملات الطلب ويفوّض الخدمة.
+   * يدعم وضعي ترقيم: `cursor` (keyset، المفضل للتمرير اللانهائي) و`offset`
+   * (التوافق القديم). مؤشر تالف أو غير مطابق للترتيب ⇒ 400 برسالة عربية.
+   *
+   * @param libraryId - معرّف المكتبة نصياً كما ورد في المسار.
+   * @param params - معاملات query الخام (rootOnly/sortBy/sortOrder/limit/offset/cursor/فلاتر).
+   * @param auth - سياق المصادقة الاختياري لتطبيق التصنيفات المحظورة.
+   * @returns ControllerResult ببيانات القائمة أو خطأ مهيأ.
+   */
+  async getLibraryMedia(libraryId: string, params: Record<string, string>, auth?: AuthContext) {
     try {
       const id = this.parseId(libraryId);
       const result = await this.mediaService.getLibraryMedia(id, {
@@ -40,29 +52,31 @@ export class MediaController extends BaseController {
         sortOrder: params["sortOrder"],
         limit: this.parseLimit(params["limit"], 50),
         offset: this.parsePage(params["offset"], 0),
+        cursor: params["cursor"] || undefined,
         year: params["year"],
         genre: params["genre"],
         certification: params["certification"],
         search: params["search"],
-      });
+      }, auth);
       return this.ok(result);
     } catch (err) {
+      if (err instanceof MediaListCursorError) return this.error(err.message, 400);
       return this.handleError(err);
     }
   }
 
-  async getMediaBatch(idsParam: string) {
+  async getMediaBatch(idsParam: string, auth?: AuthContext) {
     try {
       if (!idsParam) return this.error("ids parameter required");
       const ids = idsParam.split(",").map(Number).filter(Boolean);
-      const items = await this.mediaService.getMediaBatch(ids);
+      const items = await this.mediaService.getMediaBatch(ids, auth);
       return this.ok(items);
     } catch (err) {
       return this.handleError(err);
     }
   }
 
-  async getMediaByFilter(params: Record<string, string>) {
+  async getMediaByFilter(params: Record<string, string>, auth?: AuthContext) {
     try {
       const filterBy = params["filterBy"] as
         "all" | "pinned" | "no-content" | "needs-review" | undefined;
@@ -84,7 +98,7 @@ export class MediaController extends BaseController {
           : undefined,
         page: this.parsePage(params["page"], 1),
         limit: this.parseLimit(params["limit"], 30),
-      });
+      }, auth);
 
       if (params["admin"] === "true") {
         const stats = await this.mediaService.getAdminStats();
@@ -96,9 +110,9 @@ export class MediaController extends BaseController {
     }
   }
 
-  async getPinnedItems() {
+  async getPinnedItems(auth?: AuthContext) {
     try {
-      const items = await this.mediaService.getPinnedItems();
+      const items = await this.mediaService.getPinnedItems(auth);
       return this.ok(items);
     } catch (err) {
       return this.handleError(err);
@@ -153,10 +167,10 @@ export class MediaController extends BaseController {
     }
   }
 
-  async checkPlayable(id: string) {
+  async checkPlayable(id: string, auth?: AuthContext) {
     try {
       const mediaId = this.parseId(id);
-      const info = await this.mediaService.getStreamInfo(mediaId);
+      const info = await this.mediaService.getStreamInfo(mediaId, auth);
       if (!info) return this.ok({ playable: false });
       return this.ok({
         playable: true,
@@ -171,10 +185,10 @@ export class MediaController extends BaseController {
     }
   }
 
-  async getStreamTarget(id: string) {
+  async getStreamTarget(id: string, auth?: AuthContext) {
     try {
       const mediaId = this.parseId(id);
-      const info = await this.mediaService.getStreamInfo(mediaId);
+      const info = await this.mediaService.getStreamInfo(mediaId, auth);
       if (!info) return this.notFound("Video file not found");
       return this.ok(info);
     } catch (err) {
@@ -202,11 +216,11 @@ export class MediaController extends BaseController {
     }
   }
 
-  async getRecommendations(id: string, type: string, limitStr?: string) {
+  async getRecommendations(id: string, type: string, limitStr?: string, auth?: AuthContext) {
     try {
       const mediaId = this.parseId(id);
       const limit = this.parseLimit(limitStr, 20);
-      const media = await this.mediaService.getMediaById(mediaId);
+      const media = await this.mediaService.getMediaById(mediaId, auth);
       const libraryId = (media as Record<string, unknown>)?.["library_id"] as number;
       const mediaType = (media as Record<string, unknown>)?.["type"] as string | undefined;
       const items = await this.mediaService.getRecommendations(
@@ -214,6 +228,7 @@ export class MediaController extends BaseController {
         libraryId,
         type === "all" ? undefined : mediaType,
         limit,
+        auth,
       );
       return this.ok(items);
     } catch (err) {
@@ -270,20 +285,20 @@ export class MediaController extends BaseController {
     }
   }
 
-  async getPersonWorks(id: string) {
+  async getPersonWorks(id: string, auth?: AuthContext) {
     try {
       const personId = this.parseId(id);
-      const works = await this.mediaService.getPersonWorks(personId);
+      const works = await this.mediaService.getPersonWorks(personId, auth);
       return this.ok(works);
     } catch (err) {
       return this.handleError(err);
     }
   }
 
-  async getMediaChildren(parentId: string) {
+  async getMediaChildren(parentId: string, auth?: AuthContext) {
     try {
       const id = this.parseId(parentId);
-      const items = await this.mediaService.getMediaChildren(id);
+      const items = await this.mediaService.getMediaChildren(id, auth);
       return this.ok(items);
     } catch (err) {
       return this.handleError(err);

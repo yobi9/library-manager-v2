@@ -17,14 +17,12 @@ const PRIMARY_KEY_MAP: Record<string, string> = {
   security_events: "event_id",
   pending_enrichment_approvals: "id",
   user_progress: "progress_id",
-  favorites: "favorite_id",
   media_reports: "report_id",
   visitors: "id",
   visitor_events: "id",
   news: "id",
   messages: "id",
-  ads: "id",
-  store_products: "id",
+
 };
 
 const ALLOWED_ORDER_COLUMNS: Record<string, string[]> = {
@@ -97,8 +95,6 @@ const CAMEL_TO_SNAKE: Record<string, string> = {
   originalTitle: "original_title",
   productionCompanies: "production_companies",
 };
-
-let transactionLevel = 0;
 
 /**
  * Normalizes a filesystem path to the canonical storage form persisted in
@@ -218,45 +214,8 @@ export class BaseRepository {
     });
   }
 
-  async beginTransaction(): Promise<void> {
-    const db = await getDatabase();
-    if (transactionLevel === 0) {
-      await db.run("BEGIN TRANSACTION");
-    }
-    transactionLevel++;
-  }
-
-  async commit(): Promise<void> {
-    const db = await getDatabase();
-    if (transactionLevel > 0) {
-      transactionLevel--;
-      if (transactionLevel === 0) {
-        await db.run("COMMIT");
-      }
-    }
-  }
-
-  async rollback(): Promise<void> {
-    const db = await getDatabase();
-    if (transactionLevel > 0) {
-      try {
-        await db.run("ROLLBACK");
-      } catch {
-        // may already be rolled back
-      }
-      transactionLevel = 0;
-    }
-  }
-
   async getDb(): Promise<Database> {
     return getDatabase();
-  }
-
-  private _sanitizeOrderBy(column: string | undefined): string {
-    if (!column) return "created_at";
-    const col = column.includes(".") ? column.split(".").pop()! : column;
-    const allowed = ALLOWED_ORDER_COLUMNS[this.tableName] ?? ALLOWED_ORDER_COLUMNS["default"]!;
-    return allowed.includes(col) ? col : "created_at";
   }
 
   async getAll(limit = 1000) {
@@ -297,13 +256,9 @@ export class BaseRepository {
     const keys = Object.keys(dbData);
     const values = Object.values(dbData);
     const placeholders = keys.map(() => "?").join(", ");
-    const sql = `INSERT INTO ${this.tableName} (${keys.join(", ")}) VALUES (${placeholders})`;
-    const result = await db.run(sql, values);
-    const newId = result.lastID;
-    if (newId) {
-      return this.getById(newId);
-    }
-    return result;
+    const sql = `INSERT INTO ${this.tableName} (${keys.join(", ")}) VALUES (${placeholders}) RETURNING *`;
+    const rows = (await db.all(sql, values)) as Record<string, unknown>[];
+    return rows[0] ?? null;
   }
 
   async update(id: number | string, data: Record<string, unknown>) {
@@ -314,8 +269,9 @@ export class BaseRepository {
     const setClause = keys.map((k) => `${k} = ?`).join(", ");
     const values = [...Object.values(dbData), id];
     const pk = this.getPrimaryKey();
-    await db.run(`UPDATE ${this.tableName} SET ${setClause} WHERE ${pk} = ?`, values);
-    return this.getById(id);
+    const sql = `UPDATE ${this.tableName} SET ${setClause} WHERE ${pk} = ? RETURNING *`;
+    const rows = (await db.all(sql, values)) as Record<string, unknown>[];
+    return rows[0] ?? null;
   }
 
   async delete(id: number | string) {
@@ -349,60 +305,6 @@ export class BaseRepository {
   async execute(sql: string, params: unknown[] = []) {
     const db = await getDatabase();
     return db.run(sql, params);
-  }
-
-  async paginateAll(page = 1, limit = 20, orderBy = "created_at", order = "DESC") {
-    const col = this._sanitizeOrderBy(orderBy);
-    const offset = (page - 1) * limit;
-    const db = await getDatabase();
-    const data = await db.all(
-      `SELECT * FROM ${this.tableName} ORDER BY ${col} ${order} LIMIT ? OFFSET ?`,
-      [limit, offset],
-    );
-    const total = await this.count();
-    const totalPages = Math.ceil(total / limit);
-    return {
-      data,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages,
-        hasNextPage: page < totalPages,
-        hasPrevPage: page > 1,
-      },
-    };
-  }
-
-  async paginateByField(
-    field: string,
-    value: unknown,
-    page = 1,
-    limit = 20,
-    orderBy = "created_at",
-    order = "DESC",
-  ) {
-    const col = this._sanitizeOrderBy(orderBy);
-    const offset = (page - 1) * limit;
-    const db = await getDatabase();
-    const data = await db.all(
-      `SELECT * FROM ${this.tableName} WHERE ${field} = ? ORDER BY ${col} ${order} LIMIT ? OFFSET ?`,
-      [value, limit, offset],
-    );
-    const row = (await db.get(
-      `SELECT COUNT(*) as count FROM ${this.tableName} WHERE ${field} = ?`,
-      [value],
-    )) as { count: number } | undefined;
-    const total = row?.count ?? 0;
-    return {
-      data,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-      },
-    };
   }
 
   normalizePath(filePath: string): string {

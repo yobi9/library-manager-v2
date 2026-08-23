@@ -1,7 +1,6 @@
 import { NextRequest } from "next/server";
 import { toNextResponse, requireAuth, handleRouteError } from "@/backend/api/route-helpers";
-import { ScanController } from "@/backend/controllers/scan-controller";
-import { getServices } from "@/backend/services";
+import { getControllers } from "@/backend/controllers";
 
 export async function GET(
   request: NextRequest,
@@ -10,9 +9,8 @@ export async function GET(
   try {
     requireAuth(request);
     const { id } = await params;
-    const s = getServices();
-    const controller = new ScanController(s.scanner, s.library);
-    return toNextResponse(await controller.getProgress(id));
+    const { scan } = getControllers();
+    return toNextResponse(await scan.getProgress(id));
   } catch (error) {
     return handleRouteError(error);
   }

@@ -110,7 +110,9 @@ export function ItemsControlToolbar({
 
       {/* صندوق الفلاتر */}
       <div className="border-border bg-card grid grid-cols-1 gap-3 rounded-lg border p-3 md:grid-cols-2 lg:grid-cols-5">
-        <div className="relative lg:col-span-2">
+         <div className="space-y-1 lg:col-span-2">
+          <label className="text-xs font-bold text-muted-foreground block">البحث</label>
+          <div className="relative">
           <Search className="text-muted-foreground absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2" />
           <Input
             placeholder="بحث بالعنوان..."
@@ -120,12 +122,14 @@ export function ItemsControlToolbar({
             aria-label="بحث بالعنوان"
           />
         </div>
+        </div>
         <Select
           label="المكتبة"
           value={filters.libraryId}
           options={libraryOptions}
           onChange={(e) => onFilterChange({ libraryId: e.target.value })}
           aria-label="المكتبة"
+          
         />
         <Select
           label="النوع"

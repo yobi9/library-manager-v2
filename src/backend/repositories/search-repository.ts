@@ -37,17 +37,24 @@ export class SearchRepository extends BaseRepository {
    * @param limit - Maximum results to return.
    * @returns Array of matching media items with display fields.
    */
-  async searchMedia(query: string, limit = 20) {
+  async searchMedia(query: string, limit = 20, excludeCertifications?: string[]) {
     const db = await getDatabase();
+    const certFilter = excludeCertifications?.length
+      ? ` AND (m.certification NOT IN (${excludeCertifications.map(() => "?").join(",")}) OR m.certification IS NULL OR m.certification = '')`
+      : "";
+    const primaryParams: unknown[] = [query];
+    if (certFilter) primaryParams.push(...excludeCertifications!);
+    primaryParams.push(limit);
+
     const primary = (await db.all(
       `SELECT ms.*, m.title, m.type, m.year,   m.imdb_rating
        FROM media_search ms
        JOIN media_items m ON ms.media_id = m.media_id
        WHERE media_search MATCH ? AND m.is_available = 1
-          AND m.type NOT IN ('season', 'episode')     -- استبعاد الموسم/الحلقة من نطاق البحث (طبقة دفاع إضافية)
+          AND m.type NOT IN ('season', 'episode')${certFilter}
        ORDER BY rank
        LIMIT ?`,
-      [query, limit],
+      primaryParams,
     )) as Record<string, unknown>[];
 
     // فولباك صوتي: عندما تقل النتائج عن 3 والاستعلام ≥ 3 أحرف.
@@ -56,15 +63,19 @@ export class SearchRepository extends BaseRepository {
     const phoneticKey = getArabicPhoneticKey(query);
     if (!phoneticKey) return primary;
 
+    const fallbackParams: unknown[] = [`phonetic_key : ${phoneticKey}*`];
+    if (certFilter) fallbackParams.push(...excludeCertifications!);
+    fallbackParams.push(limit);
+
     const fallback = (await db.all(
       `SELECT ms.*, m.title, m.type, m.year, m.imdb_rating
        FROM media_search ms
        JOIN media_items m ON ms.media_id = m.media_id
        WHERE media_search MATCH ? AND m.is_available = 1
-          AND m.type NOT IN ('season', 'episode')        -- نفس الاستبعاد للفولباك الصوتي  -- استبعاد الموسم/الحلقة من نطاق البحث (طبقة دفاع إضافية)
+          AND m.type NOT IN ('season', 'episode')${certFilter}
        ORDER BY rank * 0.9
        LIMIT ?`,
-      [`phonetic_key : ${phoneticKey}*`, limit],
+      fallbackParams,
     )) as Record<string, unknown>[];
 
     return this.dedupeAppend(primary, fallback, limit);
@@ -79,6 +90,10 @@ export class SearchRepository extends BaseRepository {
    *
    * Skips items that are soft-deleted or unavailable, and excludes seasons/episodes
    * (consistent with the auto-insert trigger).
+   *
+   * يُنفَّذ داخل `runInWriterContext` (يكتب على اتصال الكاتب لا المشترك)، ويُطلق
+   * قفل الكتابة بين الدفعات عبر `setImmediate` (3.5.6) بحيث تجد كتابات العملاء
+   * نوافذ تنفيذ بين الكتل بدل التجميد خلف قفل كامل طوال الإعادة.
    */
   async rebuildIndex() {
     const db = await getDatabase();
@@ -155,6 +170,9 @@ export class SearchRepository extends BaseRepository {
       }
       lastId = Number(cursor["media_id"]);
       hasMore = rows.length === INDEX_BATCH_SIZE;
+      // أطلق قفل الكتابة بين الدفعات (3.5.6): نفس نمط `setImmediate` المعتمد في
+      // الماسح (`scan-orchestrator`) — يعطي كتابات العملاء نافذة تنفيذ بين الكتل.
+      await new Promise((resolve) => setImmediate(resolve));
     }
   }
 
@@ -352,11 +370,12 @@ export class SearchRepository extends BaseRepository {
     type?: string;
     libraryId?: number;
     year?: number;
+    excludeCertifications?: string[];
     limit: number;
     offset: number;
   }) {
     const db = await getDatabase();
-    const { normalizedQuery, type, libraryId, year, limit, offset } = params;
+    const { normalizedQuery, type, libraryId, year, excludeCertifications, limit, offset } = params;
 
    // const whereParts: string[] = ["m.is_available = 1"];
    const whereParts: string[] = ["m.is_available = 1", "m.type NOT IN ('season', 'episode')"];   // وضوح النية: نتائج البحث تشمل فقط الأفلام والمسلسلات (لا مواسم ولا حلقات)
@@ -373,6 +392,11 @@ export class SearchRepository extends BaseRepository {
     if (year) {
       whereParts.push("m.year = ?");
       filterParams.push(year);
+    }
+    if (excludeCertifications?.length) {
+      const placeholders = excludeCertifications.map(() => "?").join(",");
+      whereParts.push(`(m.certification NOT IN (${placeholders}) OR m.certification IS NULL OR m.certification = '')`);
+      filterParams.push(...excludeCertifications);
     }
 
     const whereClause = whereParts.length > 0 ? `AND ${whereParts.join(" AND ")}` : "";

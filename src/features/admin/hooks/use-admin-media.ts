@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiFetch, apiDelete, apiPost, apiPatch } from "@/lib/frontend/api";
+import { apiFetch, apiDelete, apiPost, apiPatch } from "@/lib/frontend/api-client";
 import type { MediaItem } from "@/lib/frontend/api-media";
 import type { EnrichmentOptionsPayload } from "@/features/admin/hooks/use-admin-enrichment";
 
@@ -55,13 +55,11 @@ export interface ItemMetadataPayload {
   is_pinned?: boolean;
   is_available?: boolean;
   origin_country?: string;
- tagline?: string;
- 
+  tagline?: string;
+
   sort_order?: number;
   trailer_url?: string;
   logo_url?: string;
-
-
 }
 
 /**
@@ -165,7 +163,7 @@ async function togglePinMedia(id: number): Promise<{ pinned: boolean }> {
  * @param id - Media ID to enrich.
  * @param options - Optional override options (explicit tmdbId, force flag).
  */
- async function enrichMediaItem(
+async function enrichMediaItem(
   id: number,
   options?: {
     tmdbId?: number;
@@ -270,7 +268,6 @@ async function updateItemMetadata(id: number, payload: ItemMetadataPayload): Pro
   if (!res.success) throw new Error(res.error ?? "فشل حفظ البيانات");
 }
 
- 
 /**
  * تحميل صورة من رابط خارجي وتخزينها في التخزين المحلي أو جانب الميديا.
  *
@@ -281,18 +278,17 @@ async function updateItemMetadata(id: number, payload: ItemMetadataPayload): Pro
  * @returns كائن يحتوي على `path` (المسار النسبي للصورة المحفوظة).
  * @throws خطأ إذا فشل التحميل أو كان الرابط غير آمن.
  */
-
 async function uploadMediaImage(
   mediaId: number,
   imageUrl: string,
   type: "poster" | "backdrop",
-  storageMode: string = "local", // ← قيمة افتراضية
+  storageMode: string = "local",
 ): Promise<{ path: string }> {
   const res = await apiPost<{ path: string }>("/api/enrich/upload-image", {
     mediaId,
     imageUrl,
     type,
-     storageMode, // ← تمرير القيمة المستلمة
+    storageMode,
   });
   if (!res.success || !res.data) throw new Error(res.error ?? "فشل تحميل الصورة");
   return res.data;
@@ -345,7 +341,7 @@ export function useTogglePinMedia() {
  * Mutation hook to start enrichment for a single item.
  * Accepts either a plain media ID or `{ id, tmdbId?, force? }` for the quick-enrich flow.
  */
- export function useEnrichItem() {
+export function useEnrichItem() {
   return useMutation({
     mutationFn: (payload: number | {
       id: number;
@@ -430,32 +426,23 @@ export function useUpdateItemMetadata() {
 }
 
 /**
- * Mutation hook to download an image from a URL into local storage.
- */
-// export function useUploadMediaImage() {
-//   return useMutation({
-//     mutationFn: (payload: { mediaId: number; imageUrl: string; type: "poster" | "backdrop" }) =>
-//       uploadMediaImage(payload.mediaId, payload.imageUrl, payload.type),
-//   });
-// }
-/**
  * React Query mutation hook لتحميل صورة من رابط وتخزينها.
  *
  * @returns كائن mutation مع دوال `mutate` و `mutateAsync`.
  */
 export function useUploadMediaImage() {
   return useMutation({
-    mutationFn: (payload: { 
-      mediaId: number; 
-      imageUrl: string; 
+    mutationFn: (payload: {
+      mediaId: number;
+      imageUrl: string;
       type: "poster" | "backdrop";
-      storageMode?: string; // ← اختياري
+      storageMode?: string;
     }) =>
       uploadMediaImage(
-        payload.mediaId, 
-        payload.imageUrl, 
-        payload.type, 
-        payload.storageMode ?? "local" // ← قيمة افتراضية
+        payload.mediaId,
+        payload.imageUrl,
+        payload.type,
+        payload.storageMode ?? "local",
       ),
   });
 }

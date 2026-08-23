@@ -59,17 +59,49 @@ export function buildMediaUrl(item: {
  * Matches old project's extractGenres
  * Handles: string, JSON string, array of strings, array of objects
  */
+// export function extractGenres(item: { genres?: unknown }): string[] {
+//   if (!item.genres) return [];
+
+//   const genresArray = typeof item.genres === "string" ? JSON.parse(item.genres) : item.genres;
+
+//   if (!Array.isArray(genresArray)) return [];
+
+//   return genresArray
+//     .map((genre: unknown) =>
+//       typeof genre === "string" ? genre : (genre as { name?: string }).name || "",
+//     )
+//     .filter(Boolean);
+// }
 export function extractGenres(item: { genres?: unknown }): string[] {
   if (!item.genres) return [];
 
-  const genresArray = typeof item.genres === "string" ? JSON.parse(item.genres) : item.genres;
+  let genresArray: unknown;
+
+  if (typeof item.genres === "string") {
+    try {
+      genresArray = JSON.parse(item.genres);
+    } catch {
+      // ليس JSON — نفصل النص مباشرة على الفاصلة
+      return item.genres
+        .split(/[,،]/)
+        .map((g) => g.trim())
+        .filter(Boolean);
+    }
+  } else {
+    genresArray = item.genres;
+  }
 
   if (!Array.isArray(genresArray)) return [];
 
   return genresArray
-    .map((genre: unknown) =>
-      typeof genre === "string" ? genre : (genre as { name?: string }).name || "",
-    )
+    .flatMap((genre: unknown) => {
+      const text =
+        typeof genre === "string"
+          ? genre
+          : (genre as { name?: string }).name || "";
+      // كل عنصر ممكن يحتوي على فاصلة — نفصله أيضاً
+      return text.split(/[,،]/).map((g) => g.trim()).filter(Boolean);
+    })
     .filter(Boolean);
 }
 
@@ -136,6 +168,7 @@ export function mapMediaToCard(apiItem: MediaItem, layout?: "grid" | "slider"): 
     rating: apiItem.imdb_rating ?? apiItem.rating,
     genres: extractGenres(apiItem),
     isNew: isItemNew(apiItem.created_at ?? apiItem.createdAt),
+    votes: Number(apiItem.imdb_votes ?? apiItem.voteCount ?? 0) || undefined,  // ← أضف هذا
     href: buildMediaUrl(apiItem),
     mediaType: apiItem.type || "movie",
     mediaId: id,

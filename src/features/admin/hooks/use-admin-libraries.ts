@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiFetch, apiPost, apiPatch, apiDelete } from "@/lib/frontend/api";
+import { apiFetch, apiPost, apiPatch, apiDelete } from "@/lib/frontend/api-client";
 import type { Library } from "@/lib/frontend/api-media";
 
 /**
@@ -54,6 +54,24 @@ function buildLibraryBody(data: LibraryMutationInput): FormData | LibraryMutatio
 }
 
 /**
+ * يزيل ملف الصورة الخام من مدخلات التحويل قبل دمجها في ذاكرة React Query.
+ *
+ * - السبب: حقول `Library` تقبل مسار صورة كسلسلة فقط، وكائن `File` لا يمثل
+ *   مساراً صالحاً للعرض؛ لذا يُستثنى الملف من التحديث المتفائل ويُعتمد على
+ *   إعادة الجلب بعد نجاح الطلب (`onSettled`) لإظهار الصورة الفعلية.
+ *
+ * @param variables - مدخلات إنشاء/تحديث المكتبة كما وردت من النموذج.
+ * @returns رقعة قابلة للدمج مع `Library` (الصورة سلسلة أو غائبة).
+ */
+function toOptimisticPatch(
+  variables: LibraryMutationInput,
+): Omit<Partial<Library>, "image"> & { image?: string } {
+  const { image, ...rest } = variables;
+  if (typeof image === "string") return { ...rest, image };
+  return rest;
+}
+
+/**
  * Fetch all libraries from the API.
  *
  * @returns Array of Library objects.
@@ -68,21 +86,25 @@ async function fetchLibraries(): Promise<Library[]> {
  * Create a new library.
  *
  * @param data - Library creation payload.
+ * @returns The created Library object from the server.
  */
-async function createLibrary(data: LibraryMutationInput): Promise<void> {
-  const res = await apiPost("/api/libraries", buildLibraryBody(data));
-  if (!res.success) throw new Error(res.error ?? "فشل إنشاء المكتبة");
+async function createLibrary(data: LibraryMutationInput): Promise<Library> {
+  const res = await apiPost<Library>("/api/libraries", buildLibraryBody(data));
+  if (!res.success || !res.data) throw new Error(res.error ?? "فشل إنشاء المكتبة");
+  return res.data;
 }
 
 /**
  * Update an existing library.
  *
  * @param data - Object with `id` and fields to update.
+ * @returns The updated Library object from the server.
  */
-async function updateLibrary(data: { id: number } & LibraryMutationInput): Promise<void> {
+async function updateLibrary(data: { id: number } & LibraryMutationInput): Promise<Library> {
   const { id, ...updates } = data;
-  const res = await apiPatch(`/api/libraries/${id}`, buildLibraryBody(updates));
-  if (!res.success) throw new Error(res.error ?? "فشل تحديث المكتبة");
+  const res = await apiPatch<Library>(`/api/libraries/${id}`, buildLibraryBody(updates));
+  if (!res.success || !res.data) throw new Error(res.error ?? "فشل تحديث المكتبة");
+  return res.data;
 }
 
 /**
@@ -166,58 +188,134 @@ export function useAdminLibraries() {
     queryKey: adminLibrariesKeys.all,
     queryFn: fetchLibraries,
     staleTime: 60_000,
+    refetchOnMount: false,
   });
 }
 
 /**
- * Mutation hook to create a library. Invalidates the library list on success.
+ * Mutation hook to create a library with optimistic update.
+ * The new library appears instantly in the list before server confirmation.
  */
 export function useCreateLibrary() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: createLibrary,
-    onSuccess: () => {
+    onMutate: async (variables) => {
+      await queryClient.cancelQueries({ queryKey: adminLibrariesKeys.all });
+      const previous = queryClient.getQueryData<Library[]>(adminLibrariesKeys.all);
+      queryClient.setQueryData<Library[]>(adminLibrariesKeys.all, (old) => {
+        if (!old) return old;
+        const optimistic: Library = {
+          id: 0,
+          library_id: 0,
+          name: variables.name ?? "",
+          type: variables.type ?? "movie",
+          parent_id: variables.parent_id ?? null,
+          is_container: variables.type === "container",
+          media_count: 0,
+          ...toOptimisticPatch(variables),
+        };
+        return [...old, optimistic];
+      });
+      return { previous };
+    },
+    onError: (_err, _variables, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(adminLibrariesKeys.all, context.previous);
+      }
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: adminLibrariesKeys.all });
     },
   });
 }
 
 /**
- * Mutation hook to update a library. Invalidates the library list on success.
+ * Mutation hook to update a library with optimistic update.
+ * The library fields update instantly before server confirmation.
  */
 export function useUpdateLibrary() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: updateLibrary,
-    onSuccess: () => {
+    onMutate: async (variables) => {
+      await queryClient.cancelQueries({ queryKey: adminLibrariesKeys.all });
+      const previous = queryClient.getQueryData<Library[]>(adminLibrariesKeys.all);
+      queryClient.setQueryData<Library[]>(adminLibrariesKeys.all, (old) => {
+        if (!old) return old;
+        return old.map((lib) =>
+          lib.library_id === variables.id ? { ...lib, ...toOptimisticPatch(variables) } : lib,
+        );
+      });
+      return { previous };
+    },
+    onError: (_err, _variables, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(adminLibrariesKeys.all, context.previous);
+      }
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: adminLibrariesKeys.all });
     },
   });
 }
 
 /**
- * Mutation hook to delete a library. Invalidates the library list on success.
+ * Mutation hook to delete a library with optimistic update.
+ * The library disappears instantly from the list before server confirmation.
  */
 export function useDeleteLibrary() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: deleteLibrary,
-    onSuccess: () => {
+    onMutate: async (variables) => {
+      await queryClient.cancelQueries({ queryKey: adminLibrariesKeys.all });
+      const previous = queryClient.getQueryData<Library[]>(adminLibrariesKeys.all);
+      queryClient.setQueryData<Library[]>(adminLibrariesKeys.all, (old) => {
+        if (!old) return old;
+        return old.filter((lib) => lib.library_id !== variables);
+      });
+      return { previous };
+    },
+    onError: (_err, _variables, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(adminLibrariesKeys.all, context.previous);
+      }
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: adminLibrariesKeys.all });
     },
   });
 }
 
 /**
- * Mutation hook to toggle the pinned state of a library.
- * Invalidates the library list on success.
+ * Mutation hook to toggle the pinned state of a library with optimistic update.
+ * The pin state updates instantly before server confirmation.
  */
 export function useTogglePin() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (params: { id: number; is_pinned: boolean }) =>
       apiPatch(`/api/libraries/${params.id}`, { is_pinned: params.is_pinned }),
-    onSuccess: () => {
+    onMutate: async (variables) => {
+      await queryClient.cancelQueries({ queryKey: adminLibrariesKeys.all });
+      const previous = queryClient.getQueryData<Library[]>(adminLibrariesKeys.all);
+      queryClient.setQueryData<Library[]>(adminLibrariesKeys.all, (old) => {
+        if (!old) return old;
+        return old.map((lib) =>
+          lib.library_id === variables.id
+            ? { ...lib, is_pinned: variables.is_pinned }
+            : lib,
+        );
+      });
+      return { previous };
+    },
+    onError: (_err, _variables, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(adminLibrariesKeys.all, context.previous);
+      }
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: adminLibrariesKeys.all });
     },
   });

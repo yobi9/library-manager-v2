@@ -3,9 +3,28 @@ import {
   CREW_ROLE_PRIORITY,
   type EssentialCrewRole,
 } from "@/shared/constants/crew-roles";
-import type { MediaItem } from "@/lib/frontend/api-media";
 
-type CrewMember = NonNullable<MediaItem["crew"]>[number];
+/**
+ * عضو واحد في طاقم العمل (شكل مطابق لعنصر `MediaItem["crew"]` من طبقة
+ * `@/lib/frontend`).
+ *
+ * تُعرَّف هنا محلياً بدل استيراد `MediaItem` حتى تبقى `@/shared` أدنى طبقة
+ * ولا تستورد من طبقة أعلى (عكس الاتجاه ممنوع في العمارة). التطابق البنيوي
+ * مع عناصر `crew` يجعل النوع قابلاً للتبادل مع مستهلكي `getUniqueCrewByRole`
+ * دون أي تحويل.
+ *
+ * مصدر الحقيقة: شكل `crew` كما يُعرف في `@/lib/frontend/api-media.ts`.
+ */
+export interface CrewMember {
+  character?: string;
+  person_id?: number | string;
+  name?: string;
+  display_name?: string;
+  profile_path?: string;
+  role?: string;
+  department?: string;
+  order?: number;
+}
 
 /**
  * تصفية طاقم العمل بحيث يظهر أول شخص لكل دور أساسي فقط (حسب `ESSENTIAL_CREW_ROLES`)،

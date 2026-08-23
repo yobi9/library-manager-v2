@@ -14,7 +14,7 @@ import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
 import { Select } from "@/shared/components/ui/select";
 import { Switch } from "@/shared/components/ui/switch";
-import { useFolderPicker } from "@/features/admin/hooks/use-folder-picker";
+import { useFolderPicker } from "@/lib/frontend/hooks/use-folder-picker";
 import { X, Plus, Folder } from "lucide-react";
 
 export interface LibraryFormValues {

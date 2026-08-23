@@ -1,4 +1,3 @@
-// src/features/admin/hooks/use-admin-events-sse.ts
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";

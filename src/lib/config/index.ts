@@ -1,3 +1,3 @@
-import { getEnv, getCorsOrigins, shouldUseSecureCookies } from "./env";
+import { getEnv, shouldUseSecureCookies } from "./env";
 
-export { getEnv, getCorsOrigins, shouldUseSecureCookies };
+export { getEnv, shouldUseSecureCookies };

@@ -52,7 +52,7 @@ export const CREW_ROLE_AR_LABELS: Readonly<Record<EssentialCrewRole, string>> = 
   "Assistant Director": "مساعد المخرج",
   Story: "قصة",
   Screenplay: "سيناريو",
-  Producer: " منتج  ",
+  Producer: "منتج",
 };
 
 /** العدد الافتراضي للممثلين الظاهر في قسم «طاقم التمثيل» قبل زر «عرض الكل». */

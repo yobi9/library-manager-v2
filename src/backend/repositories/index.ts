@@ -16,6 +16,4 @@ export { TranslationCacheRepository } from "./translation-cache-repository";
 export { DashboardRepository } from "./dashboard-repository";
 export { NewsRepository } from "./news-repository";
 export { MessagesRepository } from "./messages-repository";
-export { AdsRepository } from "./ads-repository";
-export { StoreProductsRepository } from "./store-products-repository";
 export { DatabaseRepository } from "./database-repository";

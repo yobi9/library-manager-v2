@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useState, useCallback, useEffect } from "react";
+import { apiFetch, apiPost, apiDelete } from "@/lib/frontend/api-client";
 
 interface User {
   id: string;
@@ -26,12 +27,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const controller = new AbortController();
     (async () => {
       try {
-        const res = await fetch("/api/auth", { signal: controller.signal });
-        if (res.ok) {
-          const data = (await res.json()) as { success: boolean; data?: User };
-          if (data.success && data.data) {
-            setUser(data.data);
-          }
+        const data = await apiFetch<User>("/api/auth", { signal: controller.signal });
+        if (data.success && data.data) {
+          setUser(data.data);
         }
       } catch {
         setUser(null);
@@ -44,12 +42,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refreshAuth = useCallback(async () => {
     try {
-      const res = await fetch("/api/auth");
-      if (res.ok) {
-        const data = (await res.json()) as { success: boolean; data?: User };
-        if (data.success && data.data) {
-          setUser(data.data);
-        }
+      const data = await apiFetch<User>("/api/auth");
+      if (data.success && data.data) {
+        setUser(data.data);
       }
     } catch {
       setUser(null);
@@ -57,28 +52,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const login = useCallback(async (username: string, password: string) => {
-    const res = await fetch("/api/auth", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, password }),
-    });
-
-    if (!res.ok) {
-      let errorMessage: string;
-      try {
-        const data = (await res.json()) as { error?: string };
-        errorMessage = data.error ?? res.statusText;
-      } catch {
-        errorMessage = res.statusText || "فشل تسجيل الدخول";
-      }
-      throw new Error(errorMessage);
-    }
-
+    await apiPost<unknown>("/api/auth", { username, password });
     await refreshAuth();
   }, [refreshAuth]);
 
   const logout = useCallback(async () => {
-    await fetch("/api/auth", { method: "DELETE" });
+    try {
+      await apiDelete("/api/auth");
+    } catch {
+      // حتى لو فشل الخادم (مثلاً جلسة منتهية أصلاً)، تُصفَّر الحالة محلياً دائماً.
+    }
     setUser(null);
   }, []);
 

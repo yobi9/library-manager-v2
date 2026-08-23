@@ -1,6 +1,6 @@
 "use client";
 
-import { SectionsGrid } from "@/shared/components/layout/sections-grid";
+import { SectionsGrid } from "@/features/viewer/components/sections/sections-grid";
 
 export default function SectionsPage() {
   return (

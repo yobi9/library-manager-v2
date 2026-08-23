@@ -97,7 +97,7 @@ describe("MediaRepository — تصنيفات الوسائط في استعلام�
     const dramaId = await insertMedia(libraryId, "فيلم دراما");
     await insertGenre(dramaId, "دراما");
 
-    const all = (await repo.getLibraryMediaFiltered(libraryId, { rootOnly: true })) as {
+    const all = (await repo.getLibraryMediaFiltered(libraryId, { rootOnly: true })) as unknown as {
       items: Array<{ media_id: number; genres?: unknown }>;
     };
     expect(genresOf(all.items, actionId)).toEqual(["أكشن"]);
@@ -106,7 +106,7 @@ describe("MediaRepository — تصنيفات الوسائط في استعلام�
     const filtered = (await repo.getLibraryMediaFiltered(libraryId, {
       rootOnly: true,
       genre: "أكشن",
-    })) as { items: Array<{ media_id: number }> };
+    })) as unknown as { items: Array<{ media_id: number }> };
     expect(filtered.items.map((i) => i.media_id)).toContain(actionId);
     expect(filtered.items.map((i) => i.media_id)).not.toContain(dramaId);
   });

@@ -15,9 +15,8 @@ import { EnrichmentController } from "./enrichment-controller";
 import { TranslationController } from "./translation-controller";
 import { NewsController } from "./news-controller";
 import { MessagesController } from "./messages-controller";
-import { AdsController } from "./ads-controller";
-import { StoreProductsController } from "./store-products-controller";
 import { ScanController } from "./scan-controller";
+import { EventsController } from "./events-controller";
 import { LiveStreamController } from "./live-stream-controller";
 import { LicenseController } from "./license-controller";
 
@@ -39,9 +38,8 @@ interface Controllers {
   translation: TranslationController;
   news: NewsController;
   messages: MessagesController;
-  ads: AdsController;
-  storeProducts: StoreProductsController;
   scan: ScanController;
+  events: EventsController;
   liveStream: LiveStreamController;
   license: LicenseController;
 }
@@ -82,15 +80,12 @@ export function getControllers() {
     enrichment: new EnrichmentController(
       s.tmdbEnrichment,
       s.metadataService,
-      s.enrichmentMediaRepo,
-      s.enrichmentApproval,
     ),
     translation: new TranslationController(s.translationService, s.translationCacheRepo, s.media),
     news: new NewsController(s.news),
     messages: new MessagesController(s.messages),
-    ads: new AdsController(s.ads),
-    storeProducts: new StoreProductsController(s.storeProducts),
-    scan: new ScanController(s.scanner, s.library),
+    scan: new ScanController(s.scanner, s.library, s.LibraryMonitor),
+    events: new EventsController(s.activity, s.security),
     liveStream: new LiveStreamController(s.liveStream),
     license: new LicenseController(s.license),
   };
@@ -115,7 +110,6 @@ export { EnrichmentController } from "./enrichment-controller";
 export { TranslationController } from "./translation-controller";
 export { NewsController } from "./news-controller";
 export { MessagesController } from "./messages-controller";
-export { AdsController } from "./ads-controller";
-export { StoreProductsController } from "./store-products-controller";
+export { EventsController } from "./events-controller";
 export { LiveStreamController } from "./live-stream-controller";
 export { LicenseController } from "./license-controller";

@@ -1,3 +1,4 @@
+//src\shared\components\ui\label.tsx
 import * as React from "react";
 import { cn } from "@/lib/utils";
 

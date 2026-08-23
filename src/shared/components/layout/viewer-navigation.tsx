@@ -4,7 +4,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { ROUTES } from "@/shared/constants";
+import { ROUTES } from "@/lib/frontend/constants";
 
 interface NavLink {
   href: string;
@@ -14,6 +14,7 @@ interface NavLink {
 const navLinks: NavLink[] = [
   { href: ROUTES.HOME, label: "الرئيسية" },
   { href: ROUTES.SECTIONS, label: "الأقسام" },
+  { href: ROUTES.NEW, label: "جديد" }, // إضافة هذا السطر
   { href: ROUTES.GENRE, label: "التصنيفات" },
   { href: ROUTES.YEAR, label: "السنوات" },
   { href: ROUTES.PERSON, label: "الأشخاص" },
@@ -27,7 +28,7 @@ const navLinks: NavLink[] = [
  * - يُخفى تلقائياً تحت نقطة الكسر `lg` ويحل محله `MobileNavigation` في الهيدر.
  * - تمرير أفقي عند زيادة العناصر عن عرض الحاوية المتاحة.
  * - خلفية زجاجية مع تأثير blur.
- * - مؤشر نشاط بخلفية متوهجة.
+ * - مؤشر نشاط هادئ (خلفية ولون نص فقط، دون توهج).
  * - انتقالات ناعمة باستخدام Tailwind v4.
  * - دعم RTL وإمكانية الوصول.
  *
@@ -52,7 +53,7 @@ export function ViewerNavigation({ className }: { className?: string }) {
               "hover:bg-primary/5 hover:text-primary",
               "focus-visible:ring-primary/50 focus-visible:ring-2 focus-visible:outline-none",
               isActive
-                ? "bg-primary/10 text-primary shadow-primary/25 shadow-[0_0_16px]"
+                ? "bg-primary/10 text-primary"
                 : "text-muted-foreground hover:text-foreground",
             )}
             aria-current={isActive ? "page" : undefined}
@@ -68,7 +69,7 @@ export function ViewerNavigation({ className }: { className?: string }) {
 /**
  * نسخة التنقل للشاشات الصغيرة (قائمة منسدلة في الهيدر)
  * - تصميم عمودي أنيق مع شريط جانبي لنشاط الصفحة.
- * - نقطة نشاط متوهجة.
+ * - نقطة نشاط صغيرة بجانب العنصر النشط.
  * - تُستخدم داخل القائمة المنسدلة للهيدر تحت نقطة الكسر `lg`.
  *
  * @param onNavigate - مُنادٍ يُستدعى عند النقر على أي رابط (لإغلاق القائمة مثلاً).
@@ -97,12 +98,10 @@ export function MobileNavigation({ onNavigate }: { onNavigate?: () => void }) {
           >
             {/* شريط جانبي للنشاط (يظهر على اليمين في RTL) */}
             {isActive && (
-              <span className="bg-primary shadow-primary/40 absolute top-1/2 right-0 h-6 w-0.5 -translate-y-1/2 rounded-full shadow-[0_0_10px]" />
+              <span className="bg-primary absolute top-1/2 right-0 h-6 w-0.5 -translate-y-1/2 rounded-full" />
             )}
             <span className="flex-1 text-right">{link.label}</span>
-            {isActive && (
-              <span className="bg-primary shadow-primary/40 h-2 w-2 rounded-full shadow-[0_0_10px]" />
-            )}
+            {isActive && <span className="bg-primary h-2 w-2 rounded-full" />}
           </Link>
         );
       })}

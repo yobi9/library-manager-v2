@@ -30,6 +30,7 @@ export interface DbUser {
   is_active: number;
   max_content_rating: string;
   can_enrich: number;
+  avatar: string | null;
 }
 
 // ---- 2. user_sessions ----
@@ -65,6 +66,7 @@ export interface DbLibrary {
   status: string;
   is_pinned: number;
   country: string | null;
+  linked_library_id: number | null;
 }
 
 // ---- 4. media_items ----
@@ -242,6 +244,7 @@ export interface DbActivity {
   severity: string;
   target_id: number | null;
   entity_type: string;
+  actor_user_id: number | null;
 }
 
 // ---- 14. security_events ----
@@ -315,6 +318,7 @@ export interface DbVisitor {
   user_agent: string | null;
   ip_address: string | null;
   is_online: number;
+  is_blocked: number;
   first_seen: string | null;
   last_seen: string | null;
   created_at: string;
@@ -363,35 +367,7 @@ export interface DbMessage {
   updated_at: string;
 }
 
-// ---- 23. ads ----
-export interface DbAd {
-  id: number;
-  title: string;
-  image_url: string;
-  link_url: string | null;
-  position: "banner" | "sidebar" | "popup" | "inline";
-  is_active: number;
-  impressions: number;
-  clicks: number;
-  start_date: string | null;
-  end_date: string | null;
-  created_at: string;
-  updated_at: string;
-}
 
-// ---- 24. store_products ----
-export interface DbStoreProduct {
-  id: number;
-  name: string;
-  description: string | null;
-  price: number;
-  image_url: string | null;
-  category: string | null;
-  stock: number;
-  is_active: number;
-  created_at: string;
-  updated_at: string;
-}
 
 // ---- 25. login_attempts ----
 export interface DbLoginAttempt {

@@ -18,6 +18,8 @@ const statusLabels: Record<string, string> = {
   scanning: "جارٍ المسح",
   paused: "متوقف مؤقتاً",
   completed: "مكتمل",
+  failed: "فشل",
+  stopped: "متوقف",
   error: "خطأ",
 };
 
@@ -26,6 +28,8 @@ const statusVariants: Record<string, "default" | "secondary" | "destructive" | "
   scanning: "default",
   paused: "outline",
   completed: "secondary",
+  failed: "destructive",
+  stopped: "secondary",
   error: "destructive",
 };
 
@@ -73,9 +77,14 @@ export function ProcessesPage() {
                 variant={process.status === "error" ? "warning" : "default"}
               />
               <div className="flex justify-between text-sm text-muted-foreground">
-                <span>{process.progress ?? 0}%</span>
                 <span>
-                  {process.scanned_items ?? 0} / {process.total_items ?? 0} عنصر
+                  {process.status === "scanning" || process.status === "paused"
+                    ? "جاري المسح…"
+                    : `${process.progress ?? 0}%`}
+                </span>
+                <span>
+                  {process.scanned_items ?? 0}
+                  {process.total_items ? ` / ${process.total_items}` : ""} عنصر
                 </span>
               </div>
               <div className="flex gap-2">

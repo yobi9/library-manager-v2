@@ -1,6 +1,25 @@
 import { BaseRepository } from "./base-repository";
 import { getDatabase } from "../db/db";
 
+/**
+ * إضافة شرط SQL لاستبعاد التصنيفات المحظورة إلى clause WHERE.
+ *
+ * @param where - شرط WHERE الحالي (يتم تعديله in-place).
+ * @param params - مصفوفة البارامترات (تتم إضافة القيم إليها).
+ * @param excludeCertifications - قائمة التصنيفات المحظورة (اختياري).
+ */
+function appendCertFilter(
+  where: string,
+  params: unknown[],
+  excludeCertifications?: string[],
+): string {
+  if (!excludeCertifications?.length) return where;
+  const placeholders = excludeCertifications.map(() => "?").join(",");
+  where += ` AND (m.certification NOT IN (${placeholders}) OR m.certification IS NULL OR m.certification = '')`;
+  params.push(...excludeCertifications);
+  return where;
+}
+
 function normalizeTitle(title: string): string {
   if (!title) return "";
   return title
@@ -57,6 +76,89 @@ const GENRES_SUBQUERY = `COALESCE((
   FROM media_genres mg
   WHERE mg.media_id = m.media_id
 ), '[]') AS genres`;
+
+/**
+ * خطأ يُرمى عندما يكون رمز ترقيم قائمة الوسائط تالفاً أو لا يطابق ترتيب
+ * الاستعلام الحالي (تغيّر sortBy/sortOrder بين الصفحات).
+ * المستهلك المتوقع: MediaController الذي يحوّله إلى HTTP 400.
+ */
+export class MediaListCursorError extends Error {
+  constructor(message = "رمز ترقيم القائمة غير صالح — أعد تحميل القائمة من أولها") {
+    super(message);
+    this.name = "MediaListCursorError";
+  }
+}
+
+/**
+ * حمولة مؤشر الترقيم الداخلية قبل الترميز.
+ *
+ * @property v - إصدار صيغة المؤشر (للتوافق المستقبلي).
+ * @property s - بصمة الترتيب `sortBy|direction` لرفض مؤشر من استعلام بترتيب مختلف.
+ * @property k - قيمة مفتاح الفرز بعد COALESCE (نص دائماً: created_at أو title).
+ * @property i - معرّف آخر صف في الصفحة السابقة (رابط كسر التعادل).
+ */
+interface MediaListCursorPayload {
+  v: number;
+  s: string;
+  k: string;
+  i: number;
+}
+
+/** إصدار صيغة المؤشر الحالي. */
+const MEDIA_LIST_CURSOR_VERSION = 1;
+
+/**
+ * يبني بصمة الترتيب التي تُختم في كل مؤشر وتُتحقق عند فك الترميز،
+ * مطابقةً لتعبيرات ORDER BY في getLibraryMediaFiltered.
+ *
+ * @param sortBy - قيمة الفرز المطلوبة ("recent" أو غيره الذي يعني title).
+ * @param orderDir - اتجاه الفرز المطبع ("ASC" أو "DESC").
+ * @returns بصمة نصية مثل "recent|DESC".
+ */
+function buildSortFingerprint(sortBy: string | undefined, orderDir: "ASC" | "DESC"): string {
+  return `${sortBy === "recent" ? "recent" : "title"}|${orderDir}`;
+}
+
+/**
+ * يرمّز حمولة المؤشر إلى رمز opaque آمن للـURL (base64url لـJSON).
+ *
+ * @param payload - قيم المؤشر من آخر صف في الصفحة الحالية.
+ * @returns الرمز النصي المرسل للعميل في pagination.nextCursor.
+ */
+function encodeMediaListCursor(payload: Omit<MediaListCursorPayload, "v">): string {
+  const json = JSON.stringify({
+    ...payload,
+    v: MEDIA_LIST_CURSOR_VERSION,
+  } satisfies MediaListCursorPayload);
+  return Buffer.from(json, "utf8").toString("base64url");
+}
+
+/**
+ * يفك رمز المؤشر ويتحقق من إصداره وبنيته ومطابقة بصمة الترتيب.
+ *
+ * @param token - الرمز القادم من العميل عبر query param `cursor`.
+ * @param expectedFingerprint - بصمة الترتيب المحسوبة للاستعلام الحالي للمقارنة.
+ * @returns الحمولة الموثوقة (k نص، i عدداً صحيحاً موجباً).
+ * @throws MediaListCursorError عند تلف الترميز أو الإصدار أو البنية أو عدم تطابق البصمة.
+ */
+function decodeMediaListCursor(token: string, expectedFingerprint: string): MediaListCursorPayload {
+  let payload: MediaListCursorPayload;
+  try {
+    payload = JSON.parse(
+      Buffer.from(token, "base64url").toString("utf8"),
+    ) as MediaListCursorPayload;
+  } catch {
+    throw new MediaListCursorError();
+  }
+  const valid =
+    payload?.v === MEDIA_LIST_CURSOR_VERSION &&
+    payload.s === expectedFingerprint &&
+    typeof payload.k === "string" &&
+    Number.isInteger(payload.i) &&
+    payload.i > 0;
+  if (!valid) throw new MediaListCursorError();
+  return payload;
+}
 
 export class MediaRepository extends BaseRepository {
   constructor() {
@@ -205,17 +307,6 @@ export class MediaRepository extends BaseRepository {
     return db.all("SELECT genre FROM media_genres WHERE media_id = ?", [mediaId]);
   }
 
-  async setGenresForMedia(mediaId: number, genres: string[]) {
-    const db = await getDatabase();
-    await db.run("DELETE FROM media_genres WHERE media_id = ?", [mediaId]);
-    for (const genre of genres) {
-      await db.run("INSERT OR IGNORE INTO media_genres (media_id, genre) VALUES (?, ?)", [
-        mediaId,
-        genre,
-      ]);
-    }
-  }
-
   async getAllGenres() {
     const db = await getDatabase();
     return db.all(`
@@ -308,24 +399,6 @@ export class MediaRepository extends BaseRepository {
     return rows.map((r) => r.name);
   }
 
-  async searchMedia(query: string, libraryId?: number) {
-    const db = await getDatabase();
-    if (libraryId) {
-      return db.all(
-        `SELECT m.* FROM media_items m
-         WHERE m.library_id = ? AND m.title LIKE ? AND m.is_available = 1
-         ORDER BY m.title LIMIT 50`,
-        [libraryId, `%${query}%`],
-      );
-    }
-    return db.all(
-      `SELECT m.* FROM media_items m
-       WHERE m.title LIKE ? AND m.is_available = 1
-       ORDER BY m.title LIMIT 50`,
-      [`%${query}%`],
-    );
-  }
-
   async getAvailableYears(libraryId?: number) {
     const db = await getDatabase();
     let sql = `SELECT DISTINCT year FROM media_items
@@ -340,33 +413,38 @@ export class MediaRepository extends BaseRepository {
     return rows.map((r) => r.year);
   }
 
-  async getPinnedItems() {
+  async getPinnedItems(excludeCertifications?: string[]) {
     const db = await getDatabase();
+    const params: unknown[] = [];
+    const where = appendCertFilter(
+      "WHERE m.is_pinned = 1 AND m.is_available = 1 AND m.parent_media_id IS NULL",
+      params,
+      excludeCertifications,
+    );
     return db.all(
       `SELECT m.*, ${GENRES_SUBQUERY}
        FROM media_items m
-       WHERE m.is_pinned = 1 AND m.is_available = 1 AND m.parent_media_id IS NULL
+       ${where}
        ORDER BY m.sort_order, m.title`,
+      params,
     );
   }
 
-  async getLatestMedia(type?: string, limit = 24) {
+  async getLatestMedia(type?: string, limit = 24, excludeCertifications?: string[]) {
     const db = await getDatabase();
+    const params: unknown[] = [];
+    let where = "WHERE m.is_available = 1 AND m.parent_media_id IS NULL";
     if (type) {
-      return db.all(
-        `SELECT m.*, ${GENRES_SUBQUERY}
-         FROM media_items m
-         WHERE m.type = ? AND m.is_available = 1 AND m.parent_media_id IS NULL
-         ORDER BY m.created_at DESC LIMIT ?`,
-        [type, limit],
-      );
+      where += " AND m.type = ?";
+      params.push(type);
     }
+    where = appendCertFilter(where, params, excludeCertifications);
     return db.all(
       `SELECT m.*, ${GENRES_SUBQUERY}
        FROM media_items m
-       WHERE m.is_available = 1 AND m.parent_media_id IS NULL
+       ${where}
        ORDER BY m.created_at DESC LIMIT ?`,
-      [limit],
+      [...params, limit],
     );
   }
 
@@ -397,34 +475,52 @@ export class MediaRepository extends BaseRepository {
     return newVal;
   }
 
- async getRecommendations(mediaId: number, libraryId: number, type?: string, limit = 20) {
-  const db = await getDatabase();
-  let sql = `SELECT m.*, ${GENRES_SUBQUERY}
+  async getRecommendations(
+    mediaId: number,
+    libraryId: number,
+    type?: string,
+    limit = 20,
+    excludeCertifications?: string[],
+  ) {
+    const db = await getDatabase();
+    const params: unknown[] = [libraryId, mediaId];
+    let sql = `SELECT m.*, ${GENRES_SUBQUERY}
              FROM media_items m
              WHERE m.library_id = ?
                AND m.media_id != ?
                AND m.is_available = 1
                AND m.parent_media_id IS NULL
                AND m.type NOT IN ('season', 'episode')`;
-  const params: unknown[] = [libraryId, mediaId];
-  if (type) {
-    sql += ` AND m.type = ?`;
-    params.push(type);
+    if (type) {
+      sql += ` AND m.type = ?`;
+      params.push(type);
+    }
+    if (excludeCertifications?.length) {
+      const placeholders = excludeCertifications.map(() => "?").join(",");
+      sql += ` AND (m.certification NOT IN (${placeholders}) OR m.certification IS NULL OR m.certification = '')`;
+      params.push(...excludeCertifications);
+    }
+    sql += ` ORDER BY m.imdb_rating DESC, m.created_at DESC LIMIT ?`;
+    params.push(limit);
+    return db.all(sql, params);
   }
-  sql += ` ORDER BY m.imdb_rating DESC, m.created_at DESC LIMIT ?`;
-  params.push(limit);
-  return db.all(sql, params);
-}
 
-  async batchGetByIds(ids: (number | string)[]) {
+  async batchGetByIds(ids: (number | string)[], excludeCertifications?: string[]) {
     if (!ids.length) return [];
     const db = await getDatabase();
     const placeholders = ids.map(() => "?").join(",");
+    const params: unknown[] = [...ids];
+    let where = `m.media_id IN (${placeholders}) AND m.is_available = 1`;
+    if (excludeCertifications?.length) {
+      const certPlaceholders = excludeCertifications.map(() => "?").join(",");
+      where += ` AND (m.certification NOT IN (${certPlaceholders}) OR m.certification IS NULL OR m.certification = '')`;
+      params.push(...excludeCertifications);
+    }
     return db.all(
       `SELECT m.*, ${GENRES_SUBQUERY}
        FROM media_items m
-       WHERE m.media_id IN (${placeholders}) AND m.is_available = 1`,
-      ids,
+       WHERE ${where}`,
+      params,
     );
   }
 
@@ -454,8 +550,13 @@ export class MediaRepository extends BaseRepository {
    * @param options.sortBy - Sort column ("recent" for created_at, otherwise title).
    * @param options.sortOrder - Sort direction ("ASC" or "DESC").
    * @param options.limit - Number of items per page (default: 50).
-   * @param options.offset - Number of items to skip (default: 0).
-   * @returns An object containing the items array and total count.
+   * @param options.offset - Number of items to skip (default: 0) — يُهمل عند تمرير cursor.
+   * @param options.cursor - رمز ترقيم keyset معتم (base64url) من صفحة سابقة؛
+   *        عند وجوده تُجلب الصفحة التالية بمسند مقارنة صفوف ثابت ضد الإدراج
+   *        المتزامن بدل OFFSET، ويُحسب hasMore بجلب limit+1 داخلياً.
+   * @returns An object containing the items array and total count — ومع cursor
+   *          يُضاف hasMore المحسوب من الجلب الزائد.
+   * @throws MediaListCursorError عندما يكون الرمز تالفاً أو لا يطابق ترتيب الاستعلام الحالي.
    */
   async getLibraryMediaFiltered(
     libraryId: number,
@@ -467,8 +568,10 @@ export class MediaRepository extends BaseRepository {
       search?: string;
       sortBy?: string;
       sortOrder?: string;
+      excludeCertifications?: string[];
       limit?: number;
       offset?: number;
+      cursor?: string;
     },
   ) {
     const db = await getDatabase();
@@ -497,22 +600,82 @@ export class MediaRepository extends BaseRepository {
       where += " AND m.title LIKE ?";
       params.push(`%${options.search}%`);
     }
+    if (options.excludeCertifications?.length) {
+      const certPlaceholders = options.excludeCertifications.map(() => "?").join(",");
+      where += ` AND (m.certification NOT IN (${certPlaceholders}) OR m.certification IS NULL OR m.certification = '')`;
+      params.push(...options.excludeCertifications);
+    }
 
-    const orderCol = options.sortBy === "recent" ? "created_at" : "title";
-    const orderDir = options.sortOrder ?? "DESC";
+    // تعبيرات الفرز ملفوفة بـCOALESCE لأن العمودين قابلان للـNULL، ومقارنة
+    // NULL داخل مسند الصفوف تُلغي الصف؛ يجب تطابق التعبير بين ORDER BY والمسند.
+    // رابط كسر التعادل media_id بنفس الاتجاه يجعل الترتيب حتمياً بين الصفحات
+    // حتى تساوي قيم المفتاح (كانت سبباً كامناً للاهتزاز سابقاً).
+    const sortExpr =
+      options.sortBy === "recent" ? "COALESCE(m.created_at, '')" : "COALESCE(m.title, '')";
+    const orderDir = options.sortOrder === "ASC" ? "ASC" : "DESC";
+    const orderBy = `ORDER BY ${sortExpr} ${orderDir}, m.media_id ${orderDir}`;
 
-    const items = await db.all(
-      `SELECT m.*, ${GENRES_SUBQUERY}
-       FROM media_items m ${where} ORDER BY ${orderCol} ${orderDir} LIMIT ? OFFSET ?`,
-      [...params, limit, offset],
-    );
+    let hasMore = false;
+    let fetched: Array<Record<string, unknown>>;
+
+    if (options.cursor) {
+      // وضع keyset: مسند مقارنة صفوف (expr, id) بعد موقع المؤشر مباشرة،
+      // محصّن ضد إدراج/حذف الصفوف أثناء التمرير (لا نوافذ تنزاح).
+      const decoded = decodeMediaListCursor(
+        options.cursor,
+        buildSortFingerprint(options.sortBy, orderDir),
+      );
+      const tupleOp = orderDir === "ASC" ? ">" : "<";
+      where += ` AND (${sortExpr}, m.media_id) ${tupleOp} (?, ?)`;
+      params.push(decoded.k, decoded.i);
+      // جلب limit+1 لكشف وجود صفحة تالية دون استعلام موقع إضافي.
+      const peeked = (await db.all(
+        `SELECT m.*, ${GENRES_SUBQUERY}
+         FROM media_items m ${where} ${orderBy} LIMIT ?`,
+        [...params, limit + 1],
+      )) as Array<Record<string, unknown>>;
+      hasMore = peeked.length > limit;
+      fetched = hasMore ? peeked.slice(0, limit) : peeked;
+    } else {
+      fetched = (await db.all(
+        `SELECT m.*, ${GENRES_SUBQUERY}
+         FROM media_items m ${where} ${orderBy} LIMIT ? OFFSET ?`,
+        [...params, limit, offset],
+      )) as Array<Record<string, unknown>>;
+    }
 
     const countRow = (await db.get(
       `SELECT COUNT(*) as count FROM media_items m ${where}`,
+      // يحوي params فلاتر الاستعلام وقيم مسند المؤشر فقط — بلا LIMIT/OFFSET.
       params,
     )) as { count: number };
 
-    return { items, total: countRow.count };
+    // وضع OFFSET: الاكتمال يُحسب من الإزاحة والإجمالي (وضع المؤشر حسمه الجلب الزائد).
+    if (!options.cursor) hasMore = offset + fetched.length < countRow.count;
+
+    const result: {
+      items: Array<Record<string, unknown>>;
+      total: number;
+      hasMore?: boolean;
+      nextCursor?: string;
+    } = { items: fetched, total: countRow.count };
+
+    // المؤشر التالي يُصدر من الفرعين متى وُجدت صفحة تالية، ليعمل التمرير
+    // اللانهائي بالكامل على keyset حتى لو بدأت الصفحة الأولى عبر offset=0.
+    if (hasMore && fetched.length > 0) {
+      const lastRow = fetched[fetched.length - 1] as Record<string, unknown>;
+      result.hasMore = true;
+      result.nextCursor = encodeMediaListCursor({
+        s: buildSortFingerprint(options.sortBy, orderDir),
+        k:
+          options.sortBy === "recent"
+            ? String(lastRow["created_at"] ?? "")
+            : String(lastRow["title"] ?? ""),
+        i: Number(lastRow["media_id"]),
+      });
+    }
+
+    return result;
   }
 
   async getMediaChildren(parentMediaId: number) {
@@ -595,16 +758,23 @@ export class MediaRepository extends BaseRepository {
     );
   }
 
-  async getPersonWorks(personId: number) {
+  async getPersonWorks(personId: number, excludeCertifications?: string[]) {
     const db = await getDatabase();
+    const params: unknown[] = [personId];
+    let where = "mp.person_id = ? AND m.is_available = 1";
+    if (excludeCertifications?.length) {
+      const placeholders = excludeCertifications.map(() => "?").join(",");
+      where += ` AND (m.certification NOT IN (${placeholders}) OR m.certification IS NULL OR m.certification = '')`;
+      params.push(...excludeCertifications);
+    }
     return db.all(
       `SELECT m.*, ${GENRES_SUBQUERY}
        FROM media_items m
        JOIN media_people mp ON m.media_id = mp.media_id
-       WHERE mp.person_id = ? AND m.is_available = 1
+       WHERE ${where}
        GROUP BY m.media_id
        ORDER BY m.year DESC`,
-      [personId],
+      params,
     );
   }
 
@@ -706,6 +876,7 @@ export class MediaRepository extends BaseRepository {
     filterBy?: "all" | "pinned" | "no-content" | "needs-review";
     rootOnly?: boolean;
     excludeTypes?: string[];
+    excludeCertifications?: string[];
     page?: number;
     limit?: number;
   }) {
@@ -772,6 +943,11 @@ export class MediaRepository extends BaseRepository {
         SELECT mg.media_id FROM media_genres mg WHERE mg.genre = ?
       )`;
       queryParams.push(params.genre);
+    }
+    if (params.excludeCertifications?.length) {
+      const certPlaceholders = params.excludeCertifications.map(() => "?").join(",");
+      whereClause += ` AND (m.certification NOT IN (${certPlaceholders}) OR m.certification IS NULL OR m.certification = '')`;
+      queryParams.push(...params.excludeCertifications);
     }
 
     const countRow = (await db.get(

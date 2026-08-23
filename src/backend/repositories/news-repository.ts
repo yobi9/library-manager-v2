@@ -20,9 +20,9 @@ export class NewsRepository extends BaseRepository {
 
   override async create(data: Record<string, unknown>) {
     const db = await this.getDb();
-    const result = await db.run(
+    const rows = (await db.all(
       `INSERT INTO news (title, summary, content, image_url, author, is_published, published_at, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now')) RETURNING *`,
       [
         data.title ?? "",
         data.summary ?? null,
@@ -32,9 +32,8 @@ export class NewsRepository extends BaseRepository {
         data.is_published ? 1 : 0,
         data.is_published ? new Date().toISOString() : null,
       ],
-    );
-    if (result.lastID) return this.getById(result.lastID);
-    return result;
+    )) as Record<string, unknown>[];
+    return rows[0] ?? null;
   }
 
   override async update(id: number, data: Record<string, unknown>) {
@@ -51,11 +50,12 @@ export class NewsRepository extends BaseRepository {
     }
     fields.push("updated_at = datetime('now')");
     params.push(id);
-    await this.execute(
-      `UPDATE news SET ${fields.join(", ")} WHERE id = ?`,
+    const db = await this.getDb();
+    const rows = (await db.all(
+      `UPDATE news SET ${fields.join(", ")} WHERE id = ? RETURNING *`,
       params,
-    );
-    return this.getById(id);
+    )) as Record<string, unknown>[];
+    return rows[0] ?? null;
   }
 
   async remove(id: number) {

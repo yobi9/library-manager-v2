@@ -2,6 +2,7 @@ import { SettingsRepository } from "../repositories/settings-repository";
 import { getEventBus } from "./event-bus";
 import { CacheService } from "./cache-service";
 import { CachePrefixes } from "./cache-prefixes";
+import { runInWriterContext } from "../db/db";
 import {
   getDefaultSettings,
   buildPublicSettings,
@@ -73,6 +74,10 @@ export class SettingsService {
    * @param ip - عنوان IP الخاص بالتغيير (لسجل التدقيق).
    * @returns مصفوفة نتائج الإدراج/التحديث لكل مفتاح.
    * @throws `Error` إذا فشل تحقق أي إعداد أو فشلت العملية.
+   *
+   * @remarks تُنفَّذ كل كتابة (`upsertSetting`) داخل `runInWriterContext` (3.5.8)
+   *          بحيث تذهب على اتصال الكاتب بدل الرئيسي المشترك — يغطي التحكم بالمحتوى
+   *          الحصري (`exclusive_items`) أثناء تصفح العملاء دون تعارض أو تهنيج.
    */
   async updateSettings(
     settingsObj: Record<string, unknown>,
@@ -82,7 +87,9 @@ export class SettingsService {
     const results: unknown[] = [];
     for (const [key, value] of Object.entries(settingsObj)) {
       const validated = validateSetting(key, value);
-      const result = await this.settingsRepo.upsertSetting(key, validated, userId, ip);
+      const result = await runInWriterContext(() =>
+        this.settingsRepo.upsertSetting(key, validated, userId, ip),
+      );
       getEventBus().emit("settings_updated", { key, value: validated, userId });
       results.push(result);
     }

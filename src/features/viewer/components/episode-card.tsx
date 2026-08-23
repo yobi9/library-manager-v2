@@ -2,6 +2,8 @@
 "use client";
 
 import { Play } from "lucide-react";
+import { Badge } from "@/shared/components/ui/badge";
+import { Button } from "@/shared/components/ui/button";
 import { getEpisodeStillUrl } from "@/lib/frontend/image-helpers";
 
 interface EpisodeCardProps {
@@ -64,29 +66,29 @@ export function EpisodeCard({
 
         <div className="bg-background/60 absolute inset-0 flex items-center justify-center opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100">
           {onClick && (
-            <button
+            <Button
+              variant="default"
+              size="icon"
               onClick={(e) => {
                 e.stopPropagation();
                 onClick();
               }}
-              className="bg-primary text-primary-foreground flex h-12 w-12 items-center justify-center rounded-full shadow-lg hover:scale-110"
+              className="h-12 w-12 rounded-full shadow-lg transition-transform hover:scale-110 [&_svg]:size-5.5"
               aria-label="تشغيل الحلقة"
             >
-              <Play size={22} fill="currentColor" />
-            </button>
+              <Play fill="currentColor" />
+            </Button>
           )}
         </div>
 
         <div className="absolute top-2 right-2">
-          <span className="bg-primary text-primary-foreground rounded-md px-2 py-0.5 text-xs font-bold">
-            {episodeNumber}
-          </span>
+          <Badge variant="count">{episodeNumber}</Badge>
         </div>
 
         {duration != null && duration > 0 && (
-          <div className="bg-background/80 text-muted-foreground absolute bottom-2 left-2 flex items-center gap-1 rounded-md px-2 py-1 text-xs backdrop-blur-sm">
+          <Badge variant="glass" className="absolute bottom-2 left-2">
             {duration} دقيقة
-          </div>
+          </Badge>
         )}
       </div>
 

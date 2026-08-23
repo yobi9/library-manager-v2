@@ -174,19 +174,17 @@ export function VideoPlayer({ id, title, mimeType, fileSize }: VideoPlayerProps)
       <div className="border-border/50 w-full overflow-hidden rounded-xl border bg-black">
         <div className="relative flex aspect-video items-center justify-center bg-black">
           <div className="flex flex-col items-center gap-4 p-6 text-center">
-            <AlertCircle className="h-12 w-12 text-amber-400" />
+            <AlertCircle className="text-warning h-12 w-12" />
             <p className="text-base font-medium text-white">الصيغة غير مدعومة من المتصفح</p>
             <p className="text-sm text-white/60">
               {title} · {ext.toUpperCase()} {fileSize ? `· ${formatFileSize(fileSize)}` : ""}
             </p>
-            <a
-              href={streamUrl}
-              download
-              className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium"
-            >
-              <Download size={16} />
-              تحميل الملف
-            </a>
+            <Button asChild variant="default">
+              <a href={streamUrl} download>
+                <Download size={16} />
+                تحميل الملف
+              </a>
+            </Button>
           </div>
         </div>
       </div>
@@ -223,7 +221,7 @@ export function VideoPlayer({ id, title, mimeType, fileSize }: VideoPlayerProps)
         )}
         {state === "error" && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black p-6 text-center">
-            <AlertCircle className="h-12 w-12 text-red-400" />
+            <AlertCircle className="text-destructive h-12 w-12" />
             <p className="text-white">تعذّر تشغيل الفيديو</p>
             <Button variant="secondary" size="sm" onClick={retry}>
               <RefreshCw size={16} />

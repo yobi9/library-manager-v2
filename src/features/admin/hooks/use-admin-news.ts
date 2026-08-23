@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiFetch, apiPost, apiPut, apiDelete } from "@/lib/frontend/api";
+import { apiFetch, apiPost, apiPut, apiDelete } from "@/lib/frontend/api-client";
 
 export interface NewsItem {
   id: number;

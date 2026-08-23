@@ -18,18 +18,17 @@ export class MessagesRepository extends BaseRepository {
 
   override async create(data: Record<string, unknown>) {
     const db = await this.getDb();
-    const result = await db.run(
+    const rows = (await db.all(
       `INSERT INTO messages (user_id, title, body, type, status, created_at, updated_at)
-       VALUES (?, ?, ?, ?, 'pending', datetime('now'), datetime('now'))`,
+       VALUES (?, ?, ?, ?, 'pending', datetime('now'), datetime('now')) RETURNING *`,
       [
         data.user_id ?? null,
         data.title ?? "",
         data.body ?? "",
         data.type ?? "support",
       ],
-    );
-    if (result.lastID) return this.getById(result.lastID);
-    return result;
+    )) as Record<string, unknown>[];
+    return rows[0] ?? null;
   }
 
   async updateStatus(id: number, status: string) {

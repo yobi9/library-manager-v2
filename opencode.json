@@ -58,6 +58,7 @@
   },
   "provider": {
     "google": {
+     
       "models": {
         "gemini-3.5-flash": {
           "name": "Gemini 3.5 Flash"

@@ -1,7 +1,9 @@
 import { createHash } from "crypto";
 import { NextRequest } from "next/server";
 import { getControllers } from "@/backend/controllers";
-import { handleRouteError } from "@/backend/api/route-helpers";
+import { parseAuthFromRequest, handleRouteError } from "@/backend/api/route-helpers";
+import { resolveBlockedCertifications, shouldBlockMedia } from "@/backend/services/content-access-policy";
+import { getServices } from "@/backend/services";
 
 /** The image payload returned by the controller (raw bytes + MIME type). */
 interface ImageData {
@@ -43,6 +45,20 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const { id } = await params;
     const url = new URL(request.url);
     const typeParam = url.searchParams.get("type") ?? "poster";
+
+    if (typeParam !== "person" && typeParam !== "library") {
+      const auth = parseAuthFromRequest(request);
+      const services = getServices();
+      const settings = await services.settings.getAllSettings();
+      const certFilter = resolveBlockedCertifications(auth, settings);
+      if (certFilter.enabled) {
+        const media = (await services.media.getMediaById(Number(id), auth ?? undefined)) as Record<string, unknown> | null;
+        if (media && shouldBlockMedia(media["certification"] as string | null | undefined, certFilter)) {
+          return new Response("Image not found", { status: 404 });
+        }
+      }
+    }
+
     const opts: Record<string, string | null> = {
       w: url.searchParams.get("w"),
       h: url.searchParams.get("h"),

@@ -14,6 +14,7 @@ import { Select } from "@/shared/components/ui/select";
 import { toast } from "sonner";
 import { Save, Settings2, Users, LayoutDashboard, Wrench } from "lucide-react";
 import { useAdminSettings, useUpdateSettings } from "@/features/admin/hooks/use-admin-settings";
+ 
 
 /**
  * حالة نموذج الإعدادات — مفاتيح مطابقة لسجل الإعدادات في الباك-إند.
@@ -345,18 +346,7 @@ export function SettingsPage(): React.ReactNode {
             />
           </div>
         </SettingsCard>
-      </div>
-
-      <div className="flex justify-end">
-        <Button
-          onClick={handleSave}
-          className="bg-accent text-accent-foreground shadow-accent/20 hover:bg-accent-hover mt-4 flex h-14 items-center gap-2 rounded-lg px-8 text-lg font-black shadow-xl transition-all active:scale-95"
-          disabled={updateMutation.isPending}
-        >
-          <Save size={20} />
-          {updateMutation.isPending ? "جاري المعالجة..." : "حفظ التعديلات النهائية"}
-        </Button>
-      </div>
+ </div>
     </div>
   );
 }

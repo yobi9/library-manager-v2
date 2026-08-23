@@ -1401,6 +1401,19 @@ export class TmdbEnrichmentService extends EventEmitter {
     return this.approvalRepo.getPending(limit) as Promise<Array<Record<string, unknown>>>;
   }
 
+  /**
+   * يوافق إدارياً على اقتراح إثراء معلّق ويطبّق بياناته على العنصر.
+   *
+   * تُنفَّذ مرحلة التطبيق وتحديث حالة الموافقة إلى `approved` داخل **كتلة كاتب
+   * واحدة** (`runInWriterContext` موحّد، 3.5.9) بدل كتلتين منفصلتين — هذا يزيل
+   * تصادم كاتِب-كاتب المحتمل (N28) بين كتلة الإثراء وكتلة الحالة، ويضمن تسلسلاً
+   * كاملاً للعملية على اتصال الكاتب.
+   *
+   * @param approvalId - معرّف طلب الموافقة.
+   * @param options - خيارات إثراء جزئية قد تُمرَّر لتجاوز الافتراضات.
+   * @returns كائن نجاح بمحتوى التطبيق.
+   * @throws Error إذا لم يوجد الطلب أو لم تكن حالته `pending` أو لم يوجد العنصر أو فشل التطبيق (وتُسجَّل الحالة `failed`).
+   */
   async approveEnrichment(
     approvalId: number,
     options: Partial<EnrichmentOptions> = {},
@@ -1426,8 +1439,11 @@ export class TmdbEnrichmentService extends EventEmitter {
 
     try {
       const finalOptions = await this._getOptions(options);
-      await this._applyEnrichmentFromDetails(media, detailsEn, detailsAr, finalOptions);
-      await runInWriterContext(() => this.approvalRepo.updateStatus(approvalId, "approved"));
+      // كتلة كاتب واحدة موحّدة: تطبيق الإثراء ثم تحديث حالة الموافقة (3.5.9).
+      await runInWriterContext(async () => {
+        await this._applyEnrichmentFromDetails(media, detailsEn, detailsAr, finalOptions);
+        await this.approvalRepo.updateStatus(approvalId, "approved");
+      });
       this._logSystemEvent(
         "enrichment_approved",
         { approvalId, mediaId: media.media_id, title: media.title ?? null },
@@ -1537,3 +1553,6 @@ export class TmdbEnrichmentService extends EventEmitter {
     this.stats = { totalEnriched: 0, success: 0, failed: 0, lastRun: null };
   }
 }
+
+
+ 

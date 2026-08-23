@@ -1,3 +1,5 @@
+//src\features\admin\components\libraries-control\library-card.tsx
+
 "use client";
 
 import React, { useState } from "react";
@@ -65,9 +67,7 @@ export const LibraryCard = React.memo(function LibraryCard({
     <div
       role="button"
       tabIndex={0}
-      className="group focus-visible:ring-ring relative h-44 w-full cursor-pointer overflow-hidden 
-      rounded-xl bg-linear-to-br from-slate-800 to-slate-950  opacity-80
-       transition-all duration-200 hover:scale-[1.02] focus-visible:ring-2 focus-visible:outline-none"
+      className="group focus-visible:ring-ring from-bg-deep to-background relative h-44 w-full cursor-pointer overflow-hidden rounded-xl bg-linear-to-br opacity-80 transition-all duration-200 hover:scale-[1.02] focus-visible:ring-2 focus-visible:outline-none"
       onClick={onCardClick}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
@@ -92,14 +92,14 @@ export const LibraryCard = React.memo(function LibraryCard({
         </div>
       )}
 
-      <div className="absolute top-2 left-2   z-20 flex flex-col gap-1.5">
+      <div className="absolute top-2 left-2 z-20 flex flex-col gap-1.5">
         <button
           type="button"
           onClick={(e) => {
             e.stopPropagation();
             onDelete();
           }}
-          className="flex h-7 w-7 items-center justify-center rounded-full bg-danger/80 text-danger-foreground shadow transition-transform hover:scale-110 hover:bg-danger"
+          className="bg-danger/80 text-danger-foreground hover:bg-danger flex h-7 w-7 items-center justify-center rounded-full shadow transition-transform hover:scale-110"
           aria-label="حذف"
         >
           <Trash2 size={13} />
@@ -110,7 +110,7 @@ export const LibraryCard = React.memo(function LibraryCard({
             e.stopPropagation();
             onEdit();
           }}
-          className="flex h-7 w-7 items-center justify-center rounded-full bg-success/80 text-success-foreground shadow transition-transform hover:scale-110 hover:bg-success"
+          className="bg-success/80 text-success-foreground hover:bg-success flex h-7 w-7 items-center justify-center rounded-full shadow transition-transform hover:scale-110"
           aria-label="تعديل"
         >
           <Edit3 size={13} />
@@ -123,12 +123,12 @@ export const LibraryCard = React.memo(function LibraryCard({
           }}
           className={`flex h-7 w-7 items-center justify-center rounded-full shadow transition-transform hover:scale-110 ${
             library.is_pinned
-              ? "bg-rating-star text-white hover:bg-rating-star"
-              : "bg-slate-500/60 text-white hover:bg-rating-star/70"
+              ? "bg-rating-star text-rating-star-foreground"
+              : "bg-muted text-muted-foreground hover:bg-rating-star/20 hover:text-rating-star"
           }`}
           aria-label={library.is_pinned ? "إلغاء التثبيت" : "تثبيت"}
         >
-          <Star size={13} className={library.is_pinned ? "fill-white" : ""} />
+          <Star size={13} className={library.is_pinned ? "fill-current" : ""} />
         </button>
         {library.type !== "linked" && (
           <button
@@ -138,7 +138,7 @@ export const LibraryCard = React.memo(function LibraryCard({
               if (isScanning) onStopScan();
               else onScan();
             }}
-            className="flex h-7 w-7 items-center justify-center rounded-full bg-info/80 text-info-foreground shadow transition-transform hover:scale-110 hover:bg-info"
+            className="bg-info/80 text-info-foreground hover:bg-info flex h-7 w-7 items-center justify-center rounded-full shadow transition-transform hover:scale-110"
             aria-label={isScanning ? "إيقاف المسح" : "مسح"}
           >
             <RefreshCw size={13} className={isScanning ? "animate-spin" : ""} />
@@ -147,53 +147,18 @@ export const LibraryCard = React.memo(function LibraryCard({
       </div>
 
       {pathCount > 0 && !isContainer && (
-        <div className="absolute top-2 right-2  z-10 rounded-full bg-black/50 px-2 py-0.5 text-[10px] font-bold text-text-on-media backdrop-blur-sm">
+        <div className="text-text-on-media absolute top-2 right-2 z-10 rounded-full bg-black/50 px-2 py-0.5 text-[10px] font-bold backdrop-blur-sm">
           {pathCount} مسار
         </div>
       )}
 
-     {/* <div className="absolute bottom-4 right-4 z-10 flex flex-col items-start gap-2">
-       <h3 className="text-base leading-tight font-bold text-white drop-shadow-lg md:text-lg">
-          {library.name}
-          {count !== undefined && count > 0 && (
-            <span className="me-1 text-sm font-normal text-rating-star">
-              ({count.toLocaleString("ar-EG")})
-            </span>
-          )}
-        </h3>
-      </div>
-
-      <div className="absolute inset-x-0 bottom-2 z-10 flex flex-wrap items-center  justify-start gap-1.5 px-2">
-        {isContainer && (
-          <Badge
-            variant="destructive"
-            className="border-none px-3 py-0.5 text-[10px] font-extrabold"
-          >
-            رئيسي
-          </Badge>
-        )}
-        <Badge variant="default" className="border-none px-3 py-0.5 text-[10px] font-extrabold">
-          {typeLabel}
-        </Badge>
-        {library.hideSection && (
-          <Badge
-            variant="secondary"
-            className="flex items-center gap-1 border-none bg-black/50 px-2 py-0.5 text-[10px] text-white backdrop-blur-sm"
-          >
-            <EyeOff size={10} /> مخفي
-          </Badge>
-        )}
-      </div>
-    </div> */}
-
-
-{/* حاوية واحدة موحدة تضم الاسم والشارات معاً في الجهة اليمنى السفلى */}
-      <div className="absolute bottom-3 right-4 z-10 flex flex-col items-start gap-1.5">
+      {/* حاوية واحدة موحدة تضم الاسم والشارات معاً في الجهة اليمنى السفلى */}
+      <div className="absolute right-4 bottom-3 z-10 flex flex-col items-start gap-1.5">
         {/* 1. اسم المكتبة يظهر في الأعلى */}
-        <h3 className="text-base leading-tight font-bold text-text-on-media drop-shadow-lg md:text-lg">
+        <h3 className="text-text-on-media text-base leading-tight font-bold drop-shadow-lg md:text-lg">
           {library.name}
           {count !== undefined && count > 0 && (
-            <span className="me-1 text-sm font-normal text-rating-star">
+            <span className="text-rating-star me-1 text-sm font-normal">
               ({count.toLocaleString("ar-EG")})
             </span>
           )}
@@ -222,9 +187,6 @@ export const LibraryCard = React.memo(function LibraryCard({
           )}
         </div>
       </div>
- </div>
-
-
-
+    </div>
   );
 });

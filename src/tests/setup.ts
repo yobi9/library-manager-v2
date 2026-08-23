@@ -15,4 +15,3 @@ env.NODE_ENV = env.NODE_ENV ?? "test";
 env.JWT_SECRET = env.JWT_SECRET ?? "vitest-secret-0123456789abcdef";
 env.NEXT_PUBLIC_APP_URL = env.NEXT_PUBLIC_APP_URL ?? "http://localhost:4000";
 env.DATABASE_URL = env.DATABASE_URL ?? ":memory:";
-env.CORS_ORIGINS = env.CORS_ORIGINS ?? "*";

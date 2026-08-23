@@ -6,7 +6,7 @@ import { ActivityRepository } from "../repositories/activity-repository";
 import { SecurityEventRepository } from "../repositories/security-repository";
 import { LoginAttemptRepository } from "../repositories/login-attempt-repository";
 import { getEventBus } from "./event-bus";
-import { executeWithRetry } from "../db/db";
+import { withClientWriteFailFast } from "../db/db";
 
 const JWT_SECRET = process.env["JWT_SECRET"] as string;
 if (!JWT_SECRET) {
@@ -128,11 +128,12 @@ export class AuthService {
 
     try {
       // إنشاء الجلسة وتوثيق نشاط الدخول كتابات على الاتصال الرئيسي قد تتنازع
-      // مع كاتب الماسح أثناء مسح قيد التنفيذ (`SQLITE_BUSY`). إعادة المحاولة
-      // تجعل الـ BUSY العابر غير قاتل، فلو فشل إنشاء صف الجلسة سيبدو الدخول
-      // "ناجحاً" (JWT صدر) لكن الطلبات اللاحقة ستفشل — وهو السبب الجذري
-      // لفشل الدخول العابر المُلاحَظ أثناء المسح.
-      await executeWithRetry(() =>
+      // مع كاتب الماسح أثناء مسح قيد التنفيذ (`SQLITE_BUSY`). وضع الفشل السريع
+      // (بند العزل 3.5.4) يخفض `busy_timeout` مؤقتاً إلى 200ms بحيث تنتهي
+      // الكتابة إما بنجاح سريع أو برفض سريع بدل الانتظار 30 ثانية: فلو فشل
+      // إنشاء صف الجلسة سيبدو الدخول "ناجحاً" (JWT صدر) لكن الطلبات اللاحقة
+      // ستفشل — وهو السبب الجذري لفشل الدخول العابر المُلاحَظ أثناء المسح.
+      await withClientWriteFailFast(() =>
         this.sessionRepo.createSession({
           userId: user.user_id,
           ip,
@@ -140,7 +141,7 @@ export class AuthService {
           os: this.detectOS(userAgent),
         }),
       );
-      await executeWithRetry(() =>
+      await withClientWriteFailFast(() =>
         this.activityRepo.logActivity({
           userId: user.user_id,
           action: "user_login",

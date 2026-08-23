@@ -1,5 +1,5 @@
  
-
+//src\features\viewer\components\unified-media\unified-media.tsx
  "use client";
 
 import React, { useMemo, useCallback } from "react";
@@ -9,13 +9,17 @@ import { cn } from "@/lib/utils";
 import { SectionHeader } from "@/features/viewer/components/section-header";
 import { UnifiedCard, type UnifiedCardProps } from "@/features/viewer/components/unified-card/unified-card";
 import { Skeleton } from "@/shared/components/ui/skeleton";
+import { Button } from "@/shared/components/ui/button";
 import type { MediaItem } from "@/lib/frontend/api-media";
 import { useSliderScroll } from "../../hooks/use-slider-scroll";
  // استدعاء الهوك هنا (عدل المسار حسب مشروعك)
 
 type UnifiedMediaSize = "xs" | "sm" | "md" | "lg" | "xl";
 
-const GRID_GAP = "gap-2 sm:gap-3";
+ // قبل
+//const GRID_GAP = "gap-2 sm:gap-3";           // أفقي + عمودي = 8px/12px
+const GRID_GAP = "gap-x-2 sm:gap-x-3 gap-y-4 sm:gap-y-6";
+
 const GRID_RESPONSIVE = "grid-cols-[repeat(auto-fill,minmax(min(100%,160px),1fr))]";
 const SLIDER_RESPONSIVE = "w-[clamp(120px,20vw,160px)]";
 
@@ -228,42 +232,45 @@ export function UnifiedMedia<T extends MediaItem = MediaItem>({
 
         {/* زر السابق (يمين) */}
         {canScrollPrev && (
-          <button
+          <Button
+            variant="ghost"
             onClick={scrollPrev}
             className={cn(
-              "absolute top-0 right-0 bottom-2 z-40 w-12 items-center justify-center sm:w-14 md:w-16 flex",
+              "absolute top-0 right-0 bottom-2 z-40 h-auto w-12 items-center justify-center rounded-none px-0 sm:w-14 md:w-16",
               "from-background via-background/80 bg-linear-to-l to-transparent",
-              "text-primary transition-opacity duration-300 focus-visible:opacity-100",
-                // الزر موجود دائماً، لكن نتحكم في الرؤية والتفاعل
-    canScrollPrev ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none invisible",
-    // إذا كان hover أو موبايل، نجعله ظاهراً (بشرط أن canScrollPrev == true)
+              "text-primary transition-opacity duration-300 focus-visible:opacity-100 hover:bg-transparent",
+              // الزر موجود دائماً، لكن نتحكم في الرؤية والتفاعل
+              canScrollPrev
+                ? "opacity-100 pointer-events-auto"
+                : "opacity-0 pointer-events-none invisible",
+              // إذا كان hover أو موبايل، نجعله ظاهراً (بشرط أن canScrollPrev == true)
               isHovered || isMobile ? "opacity-100" : "opacity-0",
             )}
             aria-label="السابق"
           >
-            <div className="group/btn flex items-center justify-center w-11 h-11 md:w-13 md:h-13 rounded-full bg-background shadow-xl border-2 border-border/85 text-foreground hover:scale-110 hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all duration-300">
+            <span className="group/btn flex h-11 w-11 items-center justify-center rounded-full border-2 border-border/85 bg-background shadow-xl transition-all duration-300 hover:scale-110 hover:border-primary hover:bg-primary hover:text-primary-foreground md:h-13 md:w-13">
               <ChevronRight size={26} className="transition-transform duration-300 group-hover/btn:translate-x-0.5" />
-            </div>
-          </button>
+            </span>
+          </Button>
         )}
 
         {/* زر التالي (يسار) */}
         {canScrollNext && (
-          <button
+          <Button
+            variant="ghost"
             onClick={scrollNext}
             className={cn(
-              "absolute top-0 bottom-2 left-0 z-40 w-12 items-center justify-center sm:w-14 md:w-16 flex",
+              "absolute top-0 bottom-2 left-0 z-40 h-auto w-12 items-center justify-center rounded-none px-0 sm:w-14 md:w-16",
               "from-background via-background/80 bg-linear-to-r to-transparent",
-              "text-primary transition-opacity duration-300 focus-visible:opacity-100",
-              
+              "text-primary transition-opacity duration-300 focus-visible:opacity-100 hover:bg-transparent",
               isHovered || isMobile ? "opacity-100" : "opacity-0",
             )}
             aria-label="التالي"
           >
-            <div className="group/btn flex items-center justify-center w-11 h-11 md:w-13 md:h-13 rounded-full bg-background shadow-xl border-2 border-border/85 text-foreground hover:scale-110 hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all duration-300">
+            <span className="group/btn flex h-11 w-11 items-center justify-center rounded-full border-2 border-border/85 bg-background shadow-xl transition-all duration-300 hover:scale-110 hover:border-primary hover:bg-primary hover:text-primary-foreground md:h-13 md:w-13">
               <ChevronLeft size={26} className="transition-transform duration-300 group-hover/btn:-translate-x-0.5" />
-            </div>
-          </button>
+            </span>
+          </Button>
         )}
       </div>
     </div>

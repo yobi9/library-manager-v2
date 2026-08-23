@@ -172,13 +172,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     };
   }, [isMobileOpen]);
 
-  return (
+   return (
     <AdminThemeContext.Provider value={{ theme, setTheme: updateTheme }}>
       <SidebarContext.Provider value={{ isMobileOpen, openMobile, closeMobile }}>
         {/* الغلاف لا يحمل data-theme الآن — الثيم يُدار على `<body>` بواسطة
             سكربت ما قبل الطلاء والتأثير أعلاه، وCSS يستهدفهما مباشرة. */}
         <div className="admin-layout bg-background text-foreground flex min-h-screen">
-          {/* Overlay للسايد بار على الموبايل */}
           {isMobileOpen && (
             <div
               className="bg-black/50 fixed inset-0 z-40 lg:hidden"

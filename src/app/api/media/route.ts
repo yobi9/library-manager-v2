@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { getControllers } from "@/backend/controllers";
 import {
   requireAdmin,
+  parseAuthFromRequest,
   getQueryParam,
   getQueryNumber,
   toNextResponse,
@@ -10,6 +11,7 @@ import {
 
 export async function GET(request: NextRequest) {
   try {
+    const auth = parseAuthFromRequest(request);
     const adminList = getQueryParam(request, "admin");
     const c = getControllers();
     if (adminList === "true") {
@@ -32,11 +34,11 @@ export async function GET(request: NextRequest) {
       if (libraryId) params["libraryId"] = libraryId;
       if (type) params["type"] = type;
       if (filterBy) params["filterBy"] = filterBy;
-      return toNextResponse(await c.media.getMediaByFilter(params));
+      return toNextResponse(await c.media.getMediaByFilter(params, auth ?? undefined));
     }
     const type = getQueryParam(request, "type");
     const limit = getQueryNumber(request, "limit", 24);
-    return toNextResponse(await c.media.getLatest(type, String(limit ?? 24)));
+    return toNextResponse(await c.media.getLatest(type, String(limit ?? 24), auth ?? undefined));
   } catch (error) {
     return handleRouteError(error);
   }

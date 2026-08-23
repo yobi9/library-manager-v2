@@ -72,9 +72,13 @@ export interface PublicSettings {
 export interface AdminSettings extends PublicSettings {
   enable_registration?: boolean;
   maintenance_mode?: boolean;
+  parental_control_enabled?: boolean;
+  blocked_certifications?: string[];
   deep_scan_enabled?: boolean;
   image_storage_root?: string;
   image_placeholder_dir?: string;
+  image_safety_skin_threshold?: number;
+  image_safety_action?: string;
   tmdb_api_key?: string;
   auto_backup_enabled?: boolean;
   auto_backup_interval_hours?: number;

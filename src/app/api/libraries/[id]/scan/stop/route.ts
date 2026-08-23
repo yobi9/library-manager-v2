@@ -1,7 +1,6 @@
 import { NextRequest } from "next/server";
 import { toNextResponse, requireAdmin, handleRouteError } from "@/backend/api/route-helpers";
-import { ScanController } from "@/backend/controllers/scan-controller";
-import { getServices } from "@/backend/services";
+import { getControllers } from "@/backend/controllers";
 
 export async function POST(
   request: NextRequest,
@@ -10,9 +9,8 @@ export async function POST(
   try {
     requireAdmin(request);
     const { id } = await params;
-    const s = getServices();
-    const controller = new ScanController(s.scanner, s.library);
-    return toNextResponse(await controller.stopScan(id));
+    const { scan } = getControllers();
+    return toNextResponse(await scan.stopScan(id));
   } catch (error) {
     return handleRouteError(error);
   }

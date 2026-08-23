@@ -3,6 +3,7 @@ import { MediaRepository } from "../repositories/media-repository";
 import { TranslationCacheRepository } from "../repositories/translation-cache-repository";
 import { ActivityRepository } from "../repositories/activity-repository";
 import { getEventBus } from "./event-bus";
+import { runInWriterContext } from "../db/db";
 import { createProvider, GoogleTranslateProvider } from "./translation-provider";
 
 const MAX_CONCURRENT = 3;
@@ -271,6 +272,18 @@ export class TranslationService extends EventEmitter {
     return updateData;
   }
 
+  /**
+   * يترجم أسماء الطاقم والشخصيات غير العربية لعنصر وسائط.
+   *
+   * يقرأ الأسماء/الشخصيات من `media_people`، يترجمها عبر المزوّد، ثم يحدّث
+   * الصفوف عبر `mediaRepo.batchUpdatePersonNames/batchUpdatePersonCharacters`.
+   * عمليات الكتابة تُنفَّذ داخل `runInWriterContext` (3.5.10) فتذهب على اتصال
+   * الكاتب بدل الرئيسي المشترك — الترجمة الدفعية لا تصطدم بقراءات العملاء ولا
+   * بكاتب الماسح.
+   *
+   * @param mediaId - معرّف عنصر الوسائط.
+   * @returns عدد الأسماء والشخصيات المحدَّثة.
+   */
   async translatePeople(mediaId: number): Promise<{ updatedNames: number; updatedChars: number }> {
     if (this._rateLimited) return { updatedNames: 0, updatedChars: 0 };
 
@@ -330,18 +343,30 @@ export class TranslationService extends EventEmitter {
       const ids = nameToIds.get(name) || [];
       for (const id of ids) nameUpdates.push({ id, value: translation });
     }
-    if (nameUpdates.length > 0) await this.mediaRepo.batchUpdatePersonNames(nameUpdates);
+    if (nameUpdates.length > 0)
+      await runInWriterContext(() => this.mediaRepo.batchUpdatePersonNames(nameUpdates));
 
     const charUpdates: Array<{ id: number; value: string }> = [];
     for (const [char, translation] of charTranslations) {
       const ids = charToIds.get(char) || [];
       for (const id of ids) charUpdates.push({ id, value: translation });
     }
-    if (charUpdates.length > 0) await this.mediaRepo.batchUpdatePersonCharacters(charUpdates);
+    if (charUpdates.length > 0)
+      await runInWriterContext(() => this.mediaRepo.batchUpdatePersonCharacters(charUpdates));
 
     return { updatedNames: nameTranslations.size, updatedChars: charTranslations.size };
   }
 
+  /**
+   * يطبّق الحقول المترجمة المسموحة على عنصر وسائط واحد.
+   *
+   * يُفلتر الإدخال حسب `TRANSLATION_ALLOWED_COLUMNS` ثم يحدّث الصف عبر
+   * `mediaRepo.update` داخل `runInWriterContext` (3.5.10) — كتابة الترجمة تذهب
+   * على اتصال الكاتب بدل الرئيسي المشترك (نفس العزل الموصوف في `translatePeople`).
+   *
+   * @param mediaId - معرّف عنصر الوسائط.
+   * @param updateData - خريطة الحقول المترجمة (قد تتضمن مفاتيح خارج المسموح تُفلتَر).
+   */
   async updateItemFields(mediaId: number, updateData: Record<string, unknown>): Promise<void> {
     if (Object.keys(updateData).length === 0) return;
     const safeData: Record<string, unknown> = {};
@@ -349,7 +374,7 @@ export class TranslationService extends EventEmitter {
       if (TRANSLATION_ALLOWED_COLUMNS.has(k)) safeData[k] = v;
     }
     if (Object.keys(safeData).length === 0) return;
-    await this.mediaRepo.update(mediaId, safeData);
+    await runInWriterContext(() => this.mediaRepo.update(mediaId, safeData));
   }
 
   async processItemTranslation(
@@ -394,6 +419,17 @@ export class TranslationService extends EventEmitter {
     }
   }
 
+  /**
+   * يترجم دفعة من عناصر الوسائط في الخلفية (حتى 500 عنصر).
+   *
+   * كل كتابة عنصر تذهب على اتصال الكاتب (عبر `translatePeople`/`updateItemFields`
+   * الملفوفَين بـ `runInWriterContext`) ويُطلق قفل الكتابة بين العناصر عبر
+   * `setImmediate` (3.5.10) — كتابات العملاء تجد نوافذ تنفيذ أثناء الدفعة بدل
+   * التجميد خلف كاتب مستمر.
+   *
+   * @param mediaIds - قائمة معرّفات الوسائط للترجمة.
+   * @param session - كائن الجلسة الحيّ الذي يحدّثه الأسلوب (التقدّم/النتائج/الإلغاء).
+   */
   async processBatch(
     mediaIds: number[],
     session: {
@@ -461,6 +497,10 @@ export class TranslationService extends EventEmitter {
         failed: session.failCount,
         currentId: mediaId,
       });
+
+      // أطلق قفل الكتابة بين عناصر الدفعة (3.5.10): نفس نمط `setImmediate`
+      // المعتمد في الماسح — يعطي كتابات العملاء نافذة تنفيذ بين العناصر.
+      await new Promise((resolve) => setImmediate(resolve));
     }
 
     session.completed = !(session.cancelled || this._rateLimited);

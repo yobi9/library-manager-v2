@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiFetch, apiPost, apiPut, apiDelete } from "@/lib/frontend/api";
+import { apiFetch, apiPost, apiPut, apiDelete } from "@/lib/frontend/api-client";
 
 export interface AdminUser {
   user_id: number;
@@ -145,14 +145,13 @@ async function updateAdminUser(id: number, data: AdminUserUpdate): Promise<void>
 
 /**
  * Upload an avatar image for a user via `POST /api/user/[id]/avatar`.
- * Uses raw `fetch` because the body is `FormData`.
+ * Uses `apiPost` with a `FormData` body (handled natively by the shared client).
  */
 async function uploadAdminAvatar(id: number, file: File): Promise<void> {
   const form = new FormData();
   form.append("avatar", file);
-  const res = await fetch(`/api/user/${id}/avatar`, { method: "POST", body: form });
-  const data = (await res.json()) as { success: boolean; error?: string };
-  if (!res.ok || !data.success) throw new Error(data.error ?? "فشل رفع الصورة");
+  const res = await apiPost(`/api/user/${id}/avatar`, form);
+  if (!res.success) throw new Error(res.error ?? "فشل رفع الصورة");
 }
 
 /**

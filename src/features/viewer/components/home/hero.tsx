@@ -5,6 +5,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { useMediaById } from "@/lib/frontend/media-queries";
 import { Badge } from "@/shared/components/ui/badge";
+import { Button } from "@/shared/components/ui/button";
 import { extractGenres } from "@/lib/frontend/media-helpers";
 import { translateMediaType } from "@/lib/frontend/translate";
 import { APP_NAME } from "@/shared/constants";
@@ -93,7 +94,10 @@ export function HomeHero({ settings }: { settings: PublicSettings }) {
       />
 
       {backdropUrl && (
-        <div key={String(mediaId)} className="absolute inset-0 z-10 transition-opacity duration-1000">
+        <div
+          key={String(mediaId)}
+          className="absolute inset-0 z-10 transition-opacity duration-1000"
+        >
           <img src={backdropUrl} alt="" className="h-full w-full object-cover opacity-60" />
           <div className="absolute inset-0 bg-linear-to-t from-black/90 via-black/50 to-transparent" />
           <div className="absolute inset-0 bg-linear-to-r from-black/60 to-transparent" />
@@ -103,37 +107,24 @@ export function HomeHero({ settings }: { settings: PublicSettings }) {
       <div className="relative z-10 container mx-auto px-3 pb-28 sm:px-4 sm:pb-24 md:px-6 md:pb-20 lg:px-8">
         <div className="max-w-3xl">
           <div className="mb-4 flex flex-wrap items-center gap-3">
-            <Badge variant="secondary" className="text-foreground/70 border-white/10 bg-white/10">
-              {translateMediaType(typeLabel)}
-            </Badge>
-            {year && (
-              <Badge variant="secondary" className="text-foreground/70 border-white/10 bg-white/10">
-                {year}
-              </Badge>
-            )}
+            <Badge variant="glass">{translateMediaType(typeLabel)}</Badge>
+            {year && <Badge variant="glass">{year}</Badge>}
             {rating > 0 && (
-              <Badge
-                variant="secondary"
-                className="border-yellow-400/20 bg-yellow-400/10 text-yellow-400"
-              >
+              <Badge variant="rating">
                 ★ {Number(rating).toFixed(1)}
               </Badge>
             )}
             {isSeries && seasonsCount > 0 && (
-              <Badge variant="secondary" className="text-foreground/70 border-white/10 bg-white/10">
-                {seasonsCount} مواسم
-              </Badge>
+              <Badge variant="glass">{seasonsCount} مواسم</Badge>
             )}
             {isSeries && episodesCount > 0 && (
-              <Badge variant="secondary" className="text-foreground/70 border-white/10 bg-white/10">
-                {episodesCount} حلقات
-              </Badge>
+              <Badge variant="glass">{episodesCount} حلقات</Badge>
             )}
           </div>
 
           <h1
             className="text-foreground mb-4 text-4xl leading-tight font-bold sm:text-5xl md:text-6xl lg:text-7xl"
-            style={{ textShadow: "0 4px 60px rgba(0,0,0,0.6)" }}
+            style={{ textShadow: "var(--hero-text-shadow)" }}
           >
             {current.title}
           </h1>
@@ -141,12 +132,9 @@ export function HomeHero({ settings }: { settings: PublicSettings }) {
           {genres.length > 0 && (
             <div className="mb-4 flex flex-wrap gap-2">
               {genres.slice(0, 4).map((g) => (
-                <span
-                  key={g}
-                  className="text-foreground/40 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium backdrop-blur-sm"
-                >
+                <Badge key={g} variant="genre" className="rounded-full px-3 py-1">
                   {g}
-                </span>
+                </Badge>
               ))}
             </div>
           )}
@@ -158,51 +146,55 @@ export function HomeHero({ settings }: { settings: PublicSettings }) {
           )}
 
           <div className="flex flex-wrap gap-4">
-            <Link
-              href={href as import("next").Route}
-              className="bg-primary text-primary-foreground flex items-center gap-2 rounded-full px-8 py-3 text-sm font-bold shadow-lg transition-all hover:bg-primary/90 hover:scale-105 active:scale-95"
-            >
-              <Play size={18} />
-              شاهد الآن
-            </Link>
+            <Button asChild variant="default" size="lg" className="rounded-full px-8 font-bold shadow-lg transition-all hover:scale-105 active:scale-95">
+              <Link href={href as import("next").Route}>
+                <Play size={18} />
+                شاهد الآن
+              </Link>
+            </Button>
           </div>
         </div>
       </div>
 
       {exclusiveItems.length > 1 && (
         <div className="absolute bottom-6 left-1/2 z-30 flex -translate-x-1/2 items-center gap-6">
-          <button
+          <Button
+            variant="ghost"
+            size="icon-sm"
             onClick={() => goTo((displayIdx - 1 + exclusiveItems.length) % exclusiveItems.length)}
-            className="text-foreground/40 hover:text-foreground/80 transition-colors"
+            className="text-foreground/40 hover:text-foreground/80 text-lg"
             aria-label="السابق"
           >
             ›
-          </button>
+          </Button>
           <div className="flex gap-2">
             {exclusiveItems.map((_, i) => (
-              <button
+              <Button
                 key={i}
+                variant="ghost"
                 onClick={() => goTo(i)}
-                className={`rounded-full transition-all duration-500 ${
+                aria-label={`العنصر ${i + 1}`}
+                className={`rounded-full p-0 transition-all duration-500 hover:bg-transparent ${
                   i === displayIdx
                     ? "h-1.5 w-8 bg-white"
                     : "h-1.5 w-1.5 bg-white/30 hover:bg-white/50"
                 }`}
-                aria-label={`العنصر ${i + 1}`}
               />
             ))}
           </div>
-          <button
+          <Button
+            variant="ghost"
+            size="icon-sm"
             onClick={() => goTo((displayIdx + 1) % exclusiveItems.length)}
-            className="text-foreground/40 hover:text-foreground/80 transition-colors"
+            className="text-foreground/40 hover:text-foreground/80 text-lg"
             aria-label="التالي"
           >
             ‹
-          </button>
+          </Button>
         </div>
       )}
 
-      <div className="pointer-events-none absolute right-0 bottom-0 left-0 h-40 bg-linear-to-t from-background to-transparent" />
+      <div className="from-background pointer-events-none absolute right-0 bottom-0 left-0 h-40 bg-linear-to-t to-transparent" />
     </section>
   );
 }

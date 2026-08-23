@@ -36,8 +36,7 @@
    مصمم لمنصة أفلام ومسلسلات بمعايير عالمية. يعتمد على:
    - متغيرات CSS متتالية (Cascading Variables) تتغير تلقائياً.
    - توافق كامل بين الوضع الفاتح، الداكن، ولوحة الإدارة.
-   - تباين ألوان عالٍ (AA/AAA) وراحة بصرية ممتازة.
-   - إضافات جاهزة لعناصر الميديا (أزرار، تقييم، شارات، زجاج).
+ 
    ================================================================ */
 
 @import "tailwindcss";
@@ -88,82 +87,152 @@
 /* ================================================================
    🎨 التوكينز (Design Tokens) – سياقات الألوان
    ================================================================ */
-/* ---------- 1. الوضع الفاتح العام ---------- */
+/* ---------- 1. الوضع الفاتح العام — «ورق Criterion» ---------- */
+/* فلسفة "المحتوى أولاً" بهوية تحريرية سينمائية: قماش ورقي دافئ فاتح
+   (عائلة H≈70–85)، بطاقات بيضاء نقية تنفصل بظل حقيقي فوق الورق الأدفأ،
+   وحبر دافئ للقراءة. الـ primary كحلي حبري عميق (264) — بصمة
+   "كحلي-على-ورق" تشد الانتباه دون منافسة البوسترات، والذهبي محجوز للتقييم. */
 :root {
   /* الأساسيات */
-  --background: #f8fafc;
-  --foreground: #0f172a;
-  --card: #ffffff;
-  --card-foreground: #0f172a;
-  --popover: #ffffff;
-  --popover-foreground: #0f172a;
-  --primary: #0f172a;
-  --primary-foreground: #f8fafc;
-  --secondary: #f1f5f9;
-  --secondary-foreground: #0f172a;
-  --muted: #f1f5f9;
-  --muted-foreground: #64748b;
-  --accent: #f1f5f9;
-  --accent-foreground: #0f172a;
-  --destructive: #dc2626; /* متناسق مع كل السياقات */
-  --destructive-foreground: #ffffff;
-  --success: #10b981;
-  --success-foreground: #ffffff;
-  --warning: #f59e0b;
-  --warning-foreground: #ffffff;
-  --border: #e2e8f0;
-  --input: #e2e8f0;
-  --ring: #94a3b8;
+  --background: oklch(0.973 0.004 80); /* ورق دافئ فاتح — نهاية الإحساس الإكلينيكي البارد */
+  --foreground: oklch(0.22 0.012 60); /* حبر دافئ للقراءة على الورق — AAA */
+  --card: oklch(1 0 0); /* أبيض نقي: ينفصل بالظل فوق الورق الأدفأ */
+  --card-foreground: oklch(0.22 0.012 60);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.22 0.012 60);
+
+  /* ── الأساسي (Primary) — حبري كحلي تفاعلي ── */
+  --primary: oklch(0.235 0.042 264); /* كحلي حبري عميق — أزرار وروابط بهدوء */
+  --primary-foreground: oklch(0.985 0.002 260);
+
+  /* ── الثانوي (Secondary) ── */
+  --secondary: oklch(0.935 0.006 80); /* شرائح وشارات أوضح درجة من الورق */
+  --secondary-foreground: oklch(0.22 0.012 60);
+
+  /* ── الخافت (Muted) ── */
+  --muted: oklch(0.955 0.005 80); /* آبار خافتة مستقلة عن الثانوي */
+  --muted-foreground: oklch(0.46 0.014 70); /* رمادي حبري دافئ ≥ 7:1 على البياض */
+
+  /* ── التمييز (Accent) ── */
+  --accent: oklch(0.91 0.008 80); /* خطوة hover حقيقية مرئية */
+  --accent-foreground: oklch(0.22 0.012 60);
+
+  /* ── التدميري (Destructive) — أحمر دلالي موحد عبر كل السياقات ── */
+  --destructive: oklch(0.55 0.21 27.3); /* أحمر واضح + نص أبيض ≥ 4.5:1 */
+  --destructive-foreground: oklch(1 0 0);
+
+  /* ── النجاح والتحذير ── */
+  --success: oklch(0.45 0.14 140); /* أخضر دافئ متوافق مع ورق H80 — تباين ≥ 4.5:1 مع أبيض */
+  --success-foreground: oklch(1 0 0);
+  --warning: oklch(0.68 0.155 65); /* كهرماني معترف به بهوية دافئة */
+  --warning-foreground: oklch(
+    0.26 0.06 65
+  ); /* حبر داكن: الكهرماني الفاتح لا يحمل نصاً أبيض بمقروئية */
+
+  /* ── الحدود والمدخلات ── */
+  --border: oklch(0.895 0.007 80); /* حد دافئ مرئي على البياض */
+  --input: oklch(0.895 0.007 80);
+  --ring: oklch(0.52 0.15 264); /* حلقة تركيز بنفسجية-كحلية واضحة ≥ 3:1 */
+
+  /* ── الرسوم البيانية (Charts) — لوحة سينمائية ── */
+  --chart-1: oklch(0.523 0.221 25); /* أحمر سينمائي */
+  --chart-2: oklch(0.669 0.179 60.81); /* ذهبية أوسكار */
+  --chart-3: oklch(0.527 0.105 155.79); /* أخضر زمردي */
+  --chart-4: oklch(0.6 0.15 290); /* بنفسجي سينمائي */
+  --chart-5: oklch(0.6 0.2 20); /* مرجاني دافئ */
+
+  /* ── الشريط الجانبي (Sidebar) ── */
+  --sidebar: oklch(0.962 0.005 80); /* ورق جانبي أدكن قليلاً من القماش */
+  --sidebar-foreground: oklch(0.22 0.012 60);
+  --sidebar-primary: oklch(0.523 0.221 25);
+  --sidebar-primary-foreground: oklch(0.99 0 0);
+  --sidebar-accent: oklch(0.905 0.007 80);
+  --sidebar-accent-foreground: oklch(0.22 0.012 60);
+  --sidebar-border: oklch(0.905 0.007 80);
+  --sidebar-ring: oklch(0.523 0.221 25);
+
   --radius: 0.5rem;
 
   /* متغيرات إضافية (مساحات، ظلال، حدود) */
-  --bg-deep: #f1f5f9;
-  --bg-hover: rgba(0, 0, 0, 0.04);
-  --accent-hover: #1e293b; /* اشتقاق داكن من primary */
-  --accent-glow: rgba(0, 150, 136, 0.15);
-  --border-strong: #cbd5e1;
-  --shadow-card: 0 4px 12px rgba(0, 0, 0, 0.05);
-  --shadow-hover: 0 8px 24px rgba(0, 0, 0, 0.08);
+  --bg-deep: oklch(0.945 0.006 80); /* آبار وأقسام أعمق من الورق */
+  --bg-hover: oklch(0 0 0 / 0.04);
+  --accent-hover: oklch(0.31 0.04 262); /* اشتقاق أغمق من primary */
+  --accent-glow: oklch(0.605 0.107 183 / 0.15);
+  --border-strong: oklch(0.84 0.008 80);
+  --shadow-card: 0 4px 16px rgba(28, 22, 12, 0.08);
+  --shadow-hover: inset 0 0 10px #7c3aed, 0 0 10px #7c3aed;
+  --border-hover: #7c3aed;
+  /* لمعة سينمائية فوق البوستر — انعكاس خفيف على أعلى الصورة عند التحويم */
+  --poster-sheen: linear-gradient(to bottom, oklch(1 0 0 / 0.10) 0%, oklch(1 0 0 / 0) 35%);
 
   /* ---- إضافات منصة الأفلام ---- */
   --hero-overlay: linear-gradient(
     to top,
-    rgba(255, 255, 255, 0.95) 0%,
-    rgba(255, 255, 255, 0.6) 50%,
-    rgba(255, 255, 255, 0.1) 100%
+    oklch(0.973 0.004 80 / 0.95) 0%,
+    oklch(0.973 0.004 80 / 0.6) 50%,
+    oklch(0.973 0.004 80 / 0.1) 100%
   );
   --hero-text-shadow: 0 2px 8px rgba(255, 255, 255, 0.8);
-  --glass-bg: rgba(255, 255, 255, 0.7);
-  --glass-border: rgba(0, 0, 0, 0.08);
+  --glass-bg: oklch(0.98 0.004 80 / 0.7);
+  --glass-border: oklch(0 0 0 / 0.08);
   --glass-blur: blur(12px);
-  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+  --glass-shadow: 0 8px 32px rgba(28, 22, 12, 0.1);
 
-  --play-btn-bg: #0f172a;
-  --play-btn-text: #ffffff;
+  --play-btn-bg: oklch(0.235 0.042 264);
+  --play-btn-text: oklch(0.99 0 0);
   /* --play-btn-hover: يمكن توليده تلقائياً بـ color-mix(in srgb, var(--play-btn-bg) 90%, black) */
-  --favorite-btn-bg: rgba(0, 0, 0, 0.05);
-  --favorite-btn-border: rgba(0, 0, 0, 0.12);
-  --favorite-btn-hover-bg: rgba(0, 0, 0, 0.1);
+  --favorite-btn-bg: oklch(0 0 0 / 0.05);
+  --favorite-btn-border: oklch(0 0 0 / 0.12);
+  --favorite-btn-hover-bg: oklch(0 0 0 / 0.1);
 
-  --rating-star: #eab308; /* ذهبي دافئ */
-  --rating-star-empty: #d4d4d4;
-  --badge-bg: rgba(0, 0, 0, 0.05);
-  --badge-text: #0f172a;
-  --badge-border: rgba(0, 0, 0, 0.1);
-  --skeleton-base: #e2e8f0;
-  --skeleton-shine: #f1f5f9;
-  --text-on-media: #0f172a;
+  --rating-star: oklch(0.79 0.17 82); /* ذهبي دافئ أعمق — متوافق مع ورق Criterion */
+  --rating-star-foreground: oklch(0.19 0.02 75); /* حبر دافئ داكن — تباين ≥ 8:1 فوق الذهبي */
+  --rating-star-empty: oklch(0.86 0.006 80);
+  --badge-bg: oklch(0 0 0 / 0.05);
+  --badge-text: oklch(0.235 0.042 264);
+  --badge-border: oklch(0 0 0 / 0.1);
+  --skeleton-base: oklch(0.92 0.005 80);
+  --skeleton-shine: oklch(0.955 0.005 80);
+  --text-on-media: oklch(0.2 0.01 260);
 
   /* السويتش */
-  --switch-bg: #334f13;
-  --switch-border: #334f13;
-  --switch-thumb: #ffffff;
-  --switch-off-bg: #e2e8f0;
-  --switch-off-border: #cbd5e1;
-  --switch-off-thumb: #ffffff;
-  --switch-icon-on: #ffffff;
-  --switch-icon-off: #9ca3af;
-  --dot-indicator: #0f172a;
+  --switch-bg: oklch(0.45 0.115 152); /* أخضر "مُفعّل" متناسق مع success */
+  --switch-border: oklch(0.45 0.115 152);
+  --switch-thumb: oklch(0.99 0 0);
+  --switch-off-bg: oklch(0.92 0.006 80);
+  --switch-off-border: oklch(0.855 0.007 80);
+  --switch-off-thumb: oklch(0.99 0 0);
+  --switch-icon-on: oklch(0.99 0 0);
+  --switch-icon-off: oklch(0.62 0.015 260);
+  --dot-indicator: oklch(0.235 0.042 264);
+
+  /* ── طبقات البطاقة فوق العمل الفني (On-Media Overlay) ── */
+  /* --overlay-scrim: oklch(0.12 0.012 80); سطح تعتيم دافئ متوافق مع ورق Criterion */
+ /*   --overlay-chip: oklch(0.98 0.005 80);نص/شرائح أبيض دافئ فوق التعتيم */
+    /* ── طبقات البطاقة فوق العمل الفني (محسّنة) ── */
+  --overlay-scrim: oklch(0.15 0.01 80 / 0.85); /* أغمق قليلاً مع شفافية */
+  --overlay-chip: oklch(0.99 0.002 80); /* أبيض دافئ نقي */
+ 
+  /* ── توكينز الشارات (Badge Tokens) ── */
+  --badge-new-bg: oklch(0.618 0.2464 28.7 / 0.9);
+  --badge-new-fg: oklch(1 0 0);
+  --badge-rating-bg:  oklch(0.935 0.006 80); /* شرائح وشارات أوضح درجة من الورق */
+  --badge-rating-fg: oklch(0.22 0.012 60);
+  --badge-count-bg: oklch(0.235 0.042 264 / 0.9);
+  --badge-count-fg: oklch(1 0 0);
+
+  /* ── الثانوي (Secondary) ── */
+  
+  
+  /* ── توكينز الشريط السفلي (Chip Tokens) ── */
+  --chip-bg: oklch(0.15 0.01 80 / 0.7);
+  --chip-border: oklch(0.99 0.002 80 / 0.2);
+  --chip-fg: oklch(0.99 0.002 80);
+
+  /* ── توكينز الأيقونات والنصوص الثانوية ── */
+  --icon-overlay-fg: oklch(0.99 0.002 80);
+  --icon-subtle: oklch(0.46 0.014 70 / 0.6);
+  --text-subtle: oklch(0.46 0.014 70 / 0.6);
 
   /* الحركة */
   --duration-fast: 150ms;
@@ -176,249 +245,343 @@
   --font-estra7ah: "Estra7ah", sans-serif;
 }
 
-/* ---------- 2. الوضع الداكن العام ---------- */
+/* ---------- 2. الوضع الداكن العام — «الغسق السينمائي» ---------- */
+/* قماش أسود أعمق مع سلم ارتفاع حقيقي مرئي: background ← card ← popover،
+   طبقة تفاعلية أحادية الحبر الأبيض (نمط زر Play الأبيض)، والبوسترات
+   تحمل كل اللون. الزجاج والهياكل العظمية محايدة (H≈260) بلا همس بنفسجي،
+   والذهبي محجوز للتقييم وحلقة التركيز (شمبانيا دافئة). */
 .dark {
-  --background: #0a0a0a;
-  --foreground: #ededed;
-  --card: #0a0a0a;
-  --card-foreground: #ededed;
-  --popover: #0a0a0a;
-  --popover-foreground: #ededed;
-  --primary: #ededed;
-  --primary-foreground: #0a0a0a;
-  --secondary: #262626;
-  --secondary-foreground: #ededed;
-  --muted: #262626;
-  --muted-foreground: #a3a3a3;
-  --accent: #262626;
-  --accent-foreground: #ededed;
-  --destructive: #dc2626;
-  --destructive-foreground: #ffffff;
-  --border: #262626;
-  --input: #262626;
-  --ring: #d4d4d4;
+  --background: oklch(0.13 0.004 260); /* أسود غسق أعمق للسينما */
+  --foreground: oklch(0.94 0.003 260);
+  --card: oklch(0.175 0.005 260); /* أول درجة ارتفاع مرئية فوق القماش */
+  --card-foreground: oklch(0.94 0.003 260);
+  --popover: oklch(0.205 0.005 260); /* يطفو فوق البطاقات */
+  --popover-foreground: oklch(0.94 0.003 260);
+  --primary: oklch(0.94 0.003 260);
+  --primary-foreground: oklch(0.13 0.004 260); /* مطابق للقماش الجديد */
+  --secondary: oklch(0.245 0.006 260); /* شرائح وشارات مميزة */
+  --secondary-foreground: oklch(0.94 0.003 260);
+  --muted: oklch(0.2 0.005 260); /* آبار خافتة أساس skeletons */
+  --muted-foreground: oklch(0.72 0.008 260);
+  --accent: oklch(0.27 0.007 260); /* هدف hover أوضح من البطاقة */
+  --accent-foreground: oklch(0.94 0.003 260);
+  --destructive: oklch(0.55 0.21 27.3); /* موحد مع الفاتح: نص أبيض AA */
+  --destructive-foreground: oklch(1 0 0);
+  --success: oklch(0.55 0.16 145); /* أخضر ساطع متوهج فوق السطح الداكن */
+  --success-foreground: oklch(1 0 0);
+  --border: oklch(0.31 0.006 260); /* شعيرة مرئية على البطاقة الجديدة */
+  --input: oklch(0.31 0.006 260);
+  --ring: oklch(0.82 0.09 85); /* حلقة تركيز شمبانيا-ذهبية — توقيع دافئ مرتبط بالتقييم */
 
-  --bg-deep: #141414;
-  --bg-hover: rgba(255, 255, 255, 0.05);
-  --accent-hover: #404040;
-  --accent-glow: rgba(0, 150, 136, 0.2);
-  --border-strong: #3a3a3a;
+  --bg-deep: oklch(0.105 0.004 260); /* آبار وfooter أعمق من القماش */
+  --bg-hover: oklch(1 0 0 / 0.05);
+  --accent-hover: oklch(0.34 0.007 260); /* خطوة فوق accent */
+  --accent-glow: oklch(0.605 0.107 183 / 0.2);
+  --border-strong: oklch(0.4 0.006 260);
   --shadow-card: 0 4px 12px rgba(0, 0, 0, 0.4);
-  --shadow-hover: 0 8px 24px rgba(0, 0, 0, 0.6);
+  --shadow-hover: inset 0 0 10px #563fb0, 0 0 10px #563fb0;
+  --border-hover: #563fb0;
+  /* لمعة سينمائية فوق البوستر — انعكاس أبرد وأقوى قليلاً في الغسق السينمائي */
+  --poster-sheen: linear-gradient(to bottom, oklch(0.97 0.003 260 / 0.18) 0%, oklch(0.97 0.003 260 / 0) 40%);
 
   --hero-overlay: linear-gradient(
     to top,
-    rgba(0, 0, 0, 0.95) 0%,
-    rgba(0, 0, 0, 0.4) 50%,
-    rgba(0, 0, 0, 0.1) 100%
+    oklch(0 0 0 / 0.95) 0%,
+    oklch(0 0 0 / 0.4) 50%,
+    oklch(0 0 0 / 0.1) 100%
   );
   --hero-text-shadow: 0 2px 8px rgba(0, 0, 0, 0.8);
-  --glass-bg: rgba(20, 20, 30, 0.7);
-  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-bg: oklch(0.2 0.008 260 / 0.72); /* زجاج محايد — بلا همس بنفسجي */
+  --glass-border: oklch(1 0 0 / 0.08);
   --glass-blur: blur(12px);
   --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
 
-  --play-btn-bg: #ffffff;
-  --play-btn-text: #000000;
-  --favorite-btn-bg: rgba(255, 255, 255, 0.1);
-  --favorite-btn-border: rgba(255, 255, 255, 0.2);
-  --favorite-btn-hover-bg: rgba(255, 255, 255, 0.2);
+  --play-btn-bg: oklch(0.985 0 0);
+  --play-btn-text: oklch(0.1 0 0);
+  --favorite-btn-bg: oklch(1 0 0 / 0.1);
+  --favorite-btn-border: oklch(1 0 0 / 0.2);
+  --favorite-btn-hover-bg: oklch(1 0 0 / 0.2);
 
-  --rating-star: #f5c518;
-  --rating-star-empty: #4a4a4a;
-  --badge-bg: rgba(255, 255, 255, 0.08);
-  --badge-text: #ffffff;
-  --badge-border: rgba(255, 255, 255, 0.12);
-  --skeleton-base: #1e1e2a;
-  --skeleton-shine: #2a2a3a;
-  --text-on-media: #ffffff;
+  --rating-star: oklch(0.86 0.18 88); /* ذهبي ساطع فوق السطح الداكن */
+  --rating-star-foreground: oklch(0.15 0.01 75);
+  --rating-star-empty: oklch(0.42 0.005 260);
+  --badge-bg: oklch(1 0 0 / 0.08);
+  --badge-text: oklch(0.98 0 0);
+  --badge-border: oklch(1 0 0 / 0.12);
+  --skeleton-base: oklch(0.19 0.005 260);
+  --skeleton-shine: oklch(0.24 0.006 260);
+  --text-on-media: oklch(0.99 0 0);
 
-  --switch-bg: #334f13;
-  --switch-border: #334f13;
-  --switch-thumb: #ffffff;
-  --switch-off-bg: #374151;
-  --switch-off-border: #4b5563;
-  --switch-off-thumb: #d1d5db;
-  --dot-indicator: #ededed;
+  --switch-bg: oklch(0.5 0.12 152);
+  --switch-border: oklch(0.5 0.12 152);
+  --switch-thumb: oklch(0.99 0 0);
+  --switch-off-bg: oklch(0.37 0.02 260);
+  --switch-off-border: oklch(0.45 0.02 260);
+  --switch-off-thumb: oklch(0.87 0.006 260);
+  --dot-indicator: oklch(0.94 0.003 260);
 
+  /* ── طبقات البطاقة فوق العمل الفني (On-Media Overlay) ── */
+  /* --overlay-scrim: oklch(0.08 0.005 260);   سطح تعتيم بارد عميق للغسق السينمائي  
+  --overlay-chip: oklch(0.97 0 0); نص/شرائح أبيض نقي فوق التعتيم الداكن */
+
+
+    --overlay-scrim: oklch(0.05 0.005 260 / 0.90); /* أعمق مع شفافية عالية */
+  --overlay-chip: oklch(0.99 0 0); /* أبيض نقي */
+ 
+  --overlay-gradient: linear-gradient(
+    to bottom,
+    oklch(0.75 0.14 85 / 0.10) 0%,
+    oklch(0.08 0.04 265 / 0.85) 100%
+  );
+
+  /* ── توكينز الشارات (Badge Tokens) ── */
+  --badge-new-bg: oklch(0.618 0.2464 28.7 / 0.9);
+  --badge-new-fg: oklch(1 0 0);
+  --badge-rating-bg:oklch(0.245 0.006 260); /* شرائح وشارات مميزة */
+  --badge-rating-fg:oklch(0.94 0.003 260);
+  --badge-count-bg: oklch(0.94 0.003 260 / 0.15);
+  --badge-count-fg: oklch(0.97 0 0);
+  
+  /* ── توكينز الشريط السفلي (Chip Tokens) ── */
+  --chip-bg: oklch(0.05 0.005 260 / 0.7);
+  --chip-border: oklch(0.99 0 0 / 0.2);
+  --chip-fg: oklch(0.99 0 0);
+
+  /* ── توكينز الأيقونات والنصوص الثانوية ── */
+  --icon-overlay-fg: oklch(0.97 0 0);
+  --icon-subtle: oklch(0.72 0.008 260 / 0.7);
+  --text-subtle: oklch(0.72 0.008 260 / 0.6);
 }
 
 /* ---------- 3. لوحة الإدارة – الوضع الداكن ---------- */
 /* ثيم الإدارة – الداكن (يُفعَّل تلقائياً على `<body class="admin-layout">`،
    وهو القيمة الافتراضية عند غياب data-theme). ربطه بالـ `<body>` — بدل
    غلاف React — ضروري حتى ترث كل البوابات (Portal) والنوافذ المنبثقة
-   التوكينات، ويُطبَّق بواسطة سكربت مبكر قبل أول طلاء لمنع وميض الثيم. */
+   التوكينات، ويُطبَّق بواسطة سكربت مبكر قبل أول طلاء لمنع وميض الثيم.
+   عائلة كحلية موحدة المحور (H≈268) مع هوية تيل (H≈183) للـ primary. */
 body.admin-layout {
-  --background: #0b111e;
-  --foreground: #dee2ec;
-  --card: #151b2d;
-  --card-foreground: #dee2ec;
-  --popover: #151b2d;
-  --popover-foreground: #dee2ec;
-  --primary: #00796b; /* تباين عالي جداً */
-  --primary-foreground: #ffffff;
-  --secondary: rgba(255, 255, 255, 0.05);
-  --secondary-foreground: #dee2ec;
-  --muted: rgba(255, 255, 255, 0.05);
-  --muted-foreground: rgba(158, 162, 174, 0.6);
-  --accent: #00796b;
-  --accent-foreground: #ffffff;
-  --destructive: #dc2626;
-  --destructive-foreground: #ffffff;
-  --success: #10b981;
-  --success-foreground: #ffffff;
-  --warning: #f59e0b;
-  --warning-foreground: #ffffff;
-  --border: rgba(255, 255, 255, 0.06);
-  --input: #0f1421;
-  --ring: #00796b;
+  --background:  oklch(0.24 0.04 268);
+  --foreground: oklch(0.91 0.012 268);
+   /* --card: oklch(0.23 0.032 268); */
+ --card:oklch(0.30 0.045 268);
+  --card-foreground: oklch(0.91 0.012 268);
+  /* --popover: oklch(0.23 0.032 268); */
+   --popover: 	oklch(0.32 0.05 268);
+  --popover-foreground: oklch(0.91 0.012 268);
+  --primary: oklch(0.53 0.09 183); /* تيل عميق: نص أبيض ≥ 4.5:1 */
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary: oklch(1 0 0 / 0.05);
+  --secondary-foreground: oklch(0.91 0.012 268);
+  --muted: oklch(1 0 0 / 0.05);
+  --muted-foreground: oklch(0.71 0.018 268); /* صلب بدل الشفافية: قراءة مريحة ≥ 4.5:1 */
+  --accent: oklch(0.53 0.09 183);
+  --accent-foreground: oklch(0.99 0 0);
+  --destructive: oklch(0.58 0.2 27);
+  --destructive-foreground: oklch(1 0 0);
+  --success: oklch(0.45 0.14 163);
+  --success-foreground: oklch(1 0 0);
+  --warning: oklch(0.78 0.155 72);
+  --warning-foreground: oklch(0.26 0.06 72);
+  --border: oklch(1 0 0 / 0.06);
+  --input: oklch(0.2 0.026 268);
+  --ring: oklch(0.53 0.09 183);
 
-  --bg-deep: #0b1015;
-  --bg-hover: rgba(255, 255, 255, 0.05);
-  --accent-hover: #00695c;
-  --accent-glow: rgba(0, 150, 136, 0.15);
-  --border-strong: rgba(255, 255, 255, 0.1);
+  --bg-deep: oklch(0.16 0.024 268);
+  --bg-hover: oklch(1 0 0 / 0.05);
+  --accent-hover: oklch(0.46 0.08 182);
+  --accent-glow: oklch(0.605 0.107 183 / 0.15);
+  --border-strong: oklch(1 0 0 / 0.1);
   --shadow-card: 0 8px 32px rgba(0, 0, 0, 0.4);
-  --shadow-hover: 0 12px 48px rgba(0, 0, 0, 0.6);
+  --shadow-hover: inset 0 0 10px #563fb0, 0 0 10px #563fb0;
+  --border-hover: #563fb0;
+  --poster-sheen: none;
 
-  --hero-overlay: linear-gradient(to top, rgba(0, 0, 0, 0.9) 0%, rgba(0, 0, 0, 0.3) 70%);
+  --hero-overlay: linear-gradient(to top, oklch(0 0 0 / 0.9) 0%, oklch(0 0 0 / 0.3) 70%);
   --hero-text-shadow: 0 2px 8px rgba(0, 0, 0, 0.7);
-  --glass-bg: rgba(20, 25, 40, 0.75);
-  --glass-border: rgba(255, 255, 255, 0.05);
+  --glass-bg: oklch(0.23 0.03 268 / 0.75);
+  --glass-border: oklch(1 0 0 / 0.05);
   --glass-blur: blur(14px);
   --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
 
-  --play-btn-bg: #00796b;
-  --play-btn-text: #ffffff;
-  --favorite-btn-bg: rgba(0, 150, 136, 0.1);
-  --favorite-btn-border: rgba(0, 150, 136, 0.3);
-  --favorite-btn-hover-bg: rgba(0, 150, 136, 0.2);
+  --play-btn-bg: oklch(0.53 0.09 183);
+  --play-btn-text: oklch(0.99 0 0);
+  --favorite-btn-bg: oklch(0.605 0.107 183 / 0.1);
+  --favorite-btn-border: oklch(0.605 0.107 183 / 0.3);
+  --favorite-btn-hover-bg: oklch(0.605 0.107 183 / 0.2);
 
-  --rating-star: #f5c518;
-  --rating-star-empty: #3a3f55;
-  --badge-bg: rgba(255, 255, 255, 0.05);
-  --badge-text: #dee2ec;
-  --badge-border: rgba(255, 255, 255, 0.08);
-  --skeleton-base: #1a1f30;
-  --skeleton-shine: #242b3f;
-  --text-on-media: #ffffff;
+  --rating-star: oklch(0.85 0.1905 90);
+  --rating-star-foreground: oklch(0.15 0.01 75);
+  --rating-star-empty: oklch(0.37 0.03 268);
+  --badge-bg: oklch(1 0 0 / 0.05);
+  --badge-text: oklch(0.91 0.012 268);
+  --badge-border: oklch(1 0 0 / 0.08);
+  --skeleton-base: oklch(0.25 0.03 268);
+  --skeleton-shine: oklch(0.3 0.035 268);
+  --text-on-media: oklch(0.99 0 0);
 
   /* الحالة الدلالية */
-  --success-bg: rgba(16, 185, 129, 0.15);
-  --success-border: rgba(16, 185, 129, 0.4);
-  --success-text: #4ade80;
-  --warning-bg: rgba(245, 158, 11, 0.15);
-  --warning-border: rgba(245, 158, 11, 0.4);
-  --warning-text: #fbbf24;
-  --danger-bg: rgba(220, 38, 38, 0.15);
-  --danger-border: rgba(220, 38, 38, 0.4);
-  --danger-text: #fca5a5;
-  --info: #38bdf8;
-  --info-bg: rgba(56, 189, 248, 0.15);
-  --info-border: rgba(56, 189, 248, 0.4);
+  --success-bg: oklch(0.696 0.149 162 / 0.15);
+  --success-border: oklch(0.696 0.149 162 / 0.4);
+  --success-text: oklch(0.8 0.17 152);
+  --warning-bg: oklch(0.769 0.165 70 / 0.15);
+  --warning-border: oklch(0.769 0.165 70 / 0.4);
+  --warning-text: oklch(0.84 0.16 84);
+  --danger-bg: oklch(0.577 0.215 27 / 0.15);
+  --danger-border: oklch(0.577 0.215 27 / 0.4);
+  --danger-text: oklch(0.81 0.1 20);
+  --info: oklch(0.754 0.139 232.661);
+  --info-bg: oklch(0.754 0.139 232.661 / 0.15);
+  --info-border: oklch(0.754 0.139 232.661 / 0.4);
 
   /* إدارية */
-  --admin-scrollbar-thumb: #242e42;
-  --brand-accent: #d5ff00;
-  --brand-accent-foreground: #000000;
+  --admin-scrollbar-thumb: oklch(0.3 0.035 268);
+  --brand-accent: oklch(0.937 0.225 121);
+  --brand-accent-foreground: oklch(0.1 0 0);
 
-  --switch-bg: #8bc34a;
-  --switch-border: #8bc34a;
-  --switch-thumb: #334f13;
-  --switch-off-bg: #0f1421;
-  --switch-off-border: #0f1421;
-  --switch-off-thumb: #192034;
-  --switch-icon-on: #ffffff;
-  --switch-icon-off: #6b7280;
-  --dot-indicator: #009688;
+  --switch-bg: oklch(0.754 0.163 130.5);
+  --switch-border: oklch(0.754 0.163 130.5);
+  --switch-thumb: oklch(0.39 0.09 131);
+  --switch-off-bg: oklch(0.2 0.026 268);
+  --switch-off-border: oklch(0.2 0.026 268);
+  --switch-off-thumb: oklch(0.25 0.035 268);
+  --switch-icon-on: oklch(0.99 0 0);
+  --switch-icon-off: oklch(0.55 0.02 268);
+  --dot-indicator: oklch(0.605 0.107 183);
+
+  /* ── توكينز الشارات (Badge Tokens) ── */
+  --badge-new-bg: oklch(0.618 0.2464 28.7 / 0.9);
+  --badge-new-fg: oklch(1 0 0);
+  --badge-rating-bg: oklch(0.85 0.17 90 / 0.2);
+  --badge-rating-fg: oklch(0.15 0.01 75);
+  --badge-count-bg: oklch(0.53 0.09 183 / 0.9);
+  --badge-count-fg: oklch(1 0 0);
+
+  /* ── توكينز الشريط السفلي (Chip Tokens) ── */
+  --chip-bg: oklch(0 0 0 / 0.5);
+  --chip-border: oklch(1 0 0 / 0.15);
+  --chip-fg: oklch(0.91 0.012 268);
+
+  /* ── توكينز الأيقونات والنصوص الثانوية ── */
+  --icon-overlay-fg: oklch(0.99 0 0);
+  --icon-subtle: oklch(0.71 0.018 268 / 0.7);
+  --text-subtle: oklch(0.71 0.018 268 / 0.6);
 }
 
 /* ---------- 4. لوحة الإدارة – الوضع الفاتح ---------- */
 /* ================================================================
    🎨 ثيم الإدارة المحسن – الفاتح (admin-light)
-   ================================================================ */
+   ================================================================
+   نفس هوية التيل (H≈183) والمحور الكحلي الهادئ، على قماشية فاتحة.
+   ألوان الحالة النصية عميقة بما يكفي لـ AA على البطاقات البيضاء. */
 body.admin-layout[data-theme="light"] {
-  --background: #f8fafc;          /* أبيض مزرق نقي */
-  --foreground: #1a1a2e;          /* رمادي داكن للنصوص */
-  --card: #ffffff;
-  --card-foreground: #1a1a2e;
-  --popover: #ffffff;
-  --popover-foreground: #1a1a2e;
-  --primary: #00897b;
-  --primary-foreground: #ffffff;
-  --secondary: #f1f5f9;
-  --secondary-foreground: #1a1a2e;
-  --muted: #f1f5f9;
-  --muted-foreground: #6b7280;
-  --accent: #0e7490;
-  --accent-foreground: #ffffff;
-  --destructive: #dc2626;
-  --destructive-foreground: #ffffff;
-  --success: #10b981;
-  --success-foreground: #ffffff;
-  --warning: #f59e0b;
-  --warning-foreground: #ffffff;
-  --border: #e5e7eb;
-  --input: #f3f4f6;
-  --ring: #00897b;
+  --background: oklch(0.982 0.003 250); /* أبيض مزرق نقي */
+  --foreground: oklch(0.23 0.03 280); /* حبر كحلي-بنفسجي للنصوص */
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.23 0.03 280);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.23 0.03 280);
+  --primary: oklch(0.53 0.09 183); /* تيل موحد مع الوضع الداكن للإدارة */
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary: oklch(0.965 0.004 250);
+  --secondary-foreground: oklch(0.23 0.03 280);
+  --muted: oklch(0.965 0.004 250);
+  --muted-foreground: oklch(0.5 0.02 260);
+  --accent: oklch(0.52 0.09 222); /* سيان عميق للتمييز */
+  --accent-foreground: oklch(0.99 0 0);
+  --destructive: oklch(0.55 0.21 27.3);
+  --destructive-foreground: oklch(1 0 0);
+  --success: oklch(0.45 0.14 163);
+  --success-foreground: oklch(1 0 0);
+  --warning: oklch(0.68 0.155 65);
+  --warning-foreground: oklch(0.26 0.06 65);
+  --border: oklch(0.91 0.005 260);
+  --input: oklch(0.965 0.004 250);
+  --ring: oklch(0.53 0.09 183);
   --radius: 0.5rem;
 
   /* إضافات */
-  --bg-deep: #f1f5f9;
-  --bg-hover: rgba(0, 0, 0, 0.04);
-  --accent-hover: #155e75;
-  --accent-glow: rgba(0, 150, 136, 0.15);
-  --border-strong: #d1d5db;
+  --bg-deep: oklch(0.965 0.004 250);
+  --bg-hover: oklch(0 0 0 / 0.04);
+  --accent-hover: oklch(0.44 0.075 224);
+  --accent-glow: oklch(0.605 0.107 183 / 0.15);
+  --border-strong: oklch(0.86 0.008 258);
   --shadow-card: 0 2px 12px rgba(0, 0, 0, 0.06);
-  --shadow-hover: 0 4px 24px rgba(0, 0, 0, 0.1);
-  --hero-overlay: linear-gradient(to top, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.6) 50%, rgba(255,255,255,0.1) 100%);
-  --hero-text-shadow: 0 2px 8px rgba(255,255,255,0.8);
-  --glass-bg: rgba(255, 255, 255, 0.7);
-  --glass-border: rgba(0, 0, 0, 0.08);
+  --shadow-hover: inset 0 0 10px #7c3aed, 0 0 10px #7c3aed;
+  --border-hover: #7c3aed;
+  --poster-sheen: none;
+
+  --hero-overlay: linear-gradient(
+    to top,
+    oklch(0.99 0.002 260 / 0.95) 0%,
+    oklch(0.99 0.002 260 / 0.6) 50%,
+    oklch(0.99 0.002 260 / 0.1) 100%
+  );
+  --hero-text-shadow: 0 2px 8px rgba(255, 255, 255, 0.8);
+  --glass-bg: oklch(0.99 0.002 260 / 0.7);
+  --glass-border: oklch(0 0 0 / 0.08);
   --glass-blur: blur(12px);
   --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
-  --play-btn-bg: #00897b;
-  --play-btn-text: #ffffff;
-  --favorite-btn-bg: rgba(0, 0, 0, 0.05);
-  --favorite-btn-border: rgba(0, 0, 0, 0.12);
-  --favorite-btn-hover-bg: rgba(0, 0, 0, 0.1);
-  --rating-star: #eab308;
-  --rating-star-empty: #d4d4d4;
-  --badge-bg: rgba(0, 0, 0, 0.05);
-  --badge-text: #1a1a2e;
-  --badge-border: rgba(0, 0, 0, 0.1);
-  --skeleton-base: #e2e8f0;
-  --skeleton-shine: #f8fafc;
-  --text-on-media: #ffffff;
+  --play-btn-bg: oklch(0.53 0.09 183);
+  --play-btn-text: oklch(0.99 0 0);
+  --favorite-btn-bg: oklch(0 0 0 / 0.05);
+  --favorite-btn-border: oklch(0 0 0 / 0.12);
+  --favorite-btn-hover-bg: oklch(0 0 0 / 0.1);
+  --rating-star: oklch(0.8 0.165 85);
+  --rating-star-foreground: oklch(0.19 0.02 75);
+  --rating-star-empty: oklch(0.87 0.004 260);
+  --badge-bg: oklch(0 0 0 / 0.05);
+  --badge-text: oklch(0.23 0.03 280);
+  --badge-border: oklch(0 0 0 / 0.1);
+  --skeleton-base: oklch(0.93 0.004 260);
+  --skeleton-shine: oklch(0.982 0.003 250);
+  --text-on-media: oklch(0.99 0 0);
 
   /* الحالة الدلالية */
-  --success-bg: rgba(16, 185, 129, 0.12);
-  --success-border: rgba(16, 185, 129, 0.35);
-  --success-text: #047857;
-  --warning-bg: rgba(245, 158, 11, 0.12);
-  --warning-border: rgba(245, 158, 11, 0.35);
-  --warning-text: #b45309;
-  --danger-bg: rgba(220, 38, 38, 0.1);
-  --danger-border: rgba(220, 38, 38, 0.35);
-  --danger-text: #b91c1c;
-  --info: #0284c7;
-  --info-bg: rgba(2, 132, 199, 0.12);
-  --info-border: rgba(2, 132, 199, 0.35);
+  --success-bg: oklch(0.696 0.149 162 / 0.12);
+  --success-border: oklch(0.696 0.149 162 / 0.35);
+  --success-text: oklch(0.508 0.105 165.6);
+  --warning-bg: oklch(0.769 0.165 70 / 0.12);
+  --warning-border: oklch(0.769 0.165 70 / 0.35);
+  --warning-text: oklch(0.555 0.146 49);
+  --danger-bg: oklch(0.577 0.215 27 / 0.1);
+  --danger-border: oklch(0.577 0.215 27 / 0.35);
+  --danger-text: oklch(0.505 0.19 27.5);
+  --info: oklch(0.588 0.139 241.966);
+  --info-bg: oklch(0.588 0.139 241.966 / 0.12);
+  --info-border: oklch(0.588 0.139 241.966 / 0.35);
 
   /* إدارية */
-  --admin-scrollbar-thumb: #cbd5e1;
-  --brand-accent: #d5ff00;
-  --brand-accent-foreground: #000000;
+  --admin-scrollbar-thumb: oklch(0.86 0.008 258);
+  --brand-accent: oklch(0.937 0.225 121);
+  --brand-accent-foreground: oklch(0.1 0 0);
 
-  --switch-bg: #00897b;
-  --switch-border: #00897b;
-  --switch-thumb: #ffffff;
-  --switch-off-bg: #e5e7eb;
-  --switch-off-border: #d1d5db;
-  --switch-off-thumb: #ffffff;
-  --switch-icon-on: #ffffff;
-  --switch-icon-off: #6b7280;
-  --dot-indicator: #00897b;
+  --switch-bg: oklch(0.53 0.09 183);
+  --switch-border: oklch(0.53 0.09 183);
+  --switch-thumb: oklch(0.99 0 0);
+  --switch-off-bg: oklch(0.91 0.005 260);
+  --switch-off-border: oklch(0.86 0.008 258);
+  --switch-off-thumb: oklch(0.99 0 0);
+  --switch-icon-on: oklch(0.99 0 0);
+  --switch-icon-off: oklch(0.5 0.02 260);
+  --dot-indicator: oklch(0.53 0.09 183);
+
+  /* ── توكينز الشارات (Badge Tokens) ── */
+  --badge-new-bg: oklch(0.618 0.2464 28.7 / 0.9);
+  --badge-new-fg: oklch(1 0 0);
+  --badge-rating-bg: oklch(0.8 0.165 85 / 0.2);
+  --badge-rating-fg: oklch(0.19 0.02 75);
+  --badge-count-bg: oklch(0.53 0.09 183 / 0.9);
+  --badge-count-fg: oklch(1 0 0);
+
+  /* ── توكينز الشريط السفلي (Chip Tokens) ── */
+  --chip-bg: oklch(0 0 0 / 0.5);
+  --chip-border: oklch(0 0 0 / 0.12);
+  --chip-fg: oklch(0.23 0.03 280);
+
+  /* ── توكينز الأيقونات والنصوص الثانوية ── */
+  --icon-overlay-fg: oklch(0.99 0 0);
+  --icon-subtle: oklch(0.5 0.02 260 / 0.7);
+  --text-subtle: oklch(0.5 0.02 260 / 0.6);
 }
 /* ================================================================
    🔗 ربط المتغيرات مع Tailwind v4
@@ -460,6 +623,8 @@ body.admin-layout[data-theme="light"] {
   --color-border-strong: var(--border-strong);
   --shadow-card: var(--shadow-card);
   --shadow-hover: var(--shadow-hover);
+  --color-border-hover: var(--border-hover);
+  --poster-sheen: var(--poster-sheen);
 
   /* الحالة الدلالية */
   --color-success-bg: var(--success-bg);
@@ -491,6 +656,7 @@ body.admin-layout[data-theme="light"] {
   --color-favorite-btn-border: var(--favorite-btn-border);
   --color-favorite-btn-hover-bg: var(--favorite-btn-hover-bg);
   --color-rating-star: var(--rating-star);
+  --color-rating-star-foreground: var(--rating-star-foreground);
   --color-rating-star-empty: var(--rating-star-empty);
   --color-badge-bg: var(--badge-bg);
   --color-badge-text: var(--badge-text);
@@ -498,6 +664,28 @@ body.admin-layout[data-theme="light"] {
   --color-skeleton-base: var(--skeleton-base);
   --color-skeleton-shine: var(--skeleton-shine);
   --color-text-on-media: var(--text-on-media);
+
+  /* طبقات البطاقة فوق العمل الفني */
+  --color-overlay-scrim: var(--overlay-scrim);
+  --color-overlay-chip: var(--overlay-chip);
+
+  /* توكينز الشارات */
+  --color-badge-new-bg: var(--badge-new-bg);
+  --color-badge-new-fg: var(--badge-new-fg);
+  --color-badge-rating-bg: var(--badge-rating-bg);
+  --color-badge-rating-fg: var(--badge-rating-fg);
+  --color-badge-count-bg: var(--badge-count-bg);
+  --color-badge-count-fg: var(--badge-count-fg);
+
+  /* توكينز الشريط السفلي */
+  --color-chip-bg: var(--chip-bg);
+  --color-chip-border: var(--chip-border);
+  --color-chip-fg: var(--chip-fg);
+
+  /* توكينز الأيقونات والنصوص */
+  --color-icon-overlay-fg: var(--icon-overlay-fg);
+  --color-icon-subtle: var(--icon-subtle);
+  --color-text-subtle: var(--text-subtle);
 
   /* السويتش */
   --color-switch-bg: var(--switch-bg);
@@ -514,6 +702,17 @@ body.admin-layout[data-theme="light"] {
   --transition-fast: var(--duration-fast) var(--ease-out);
   --transition-smooth: var(--duration-normal) var(--ease-in-out);
   --transition-spring: var(--duration-slow) var(--ease-spring);
+
+
+
+
+
+
+
+ 
+
+
+
 }
 
 /* ================================================================
@@ -555,7 +754,8 @@ body {
 
 /* ---------- صناديق غارقة إلى الداخل (Inset / Depressed) ---------- */
 /* تخدع العين فتبدو حفرة غائرة بدل لوحة بارزة: ظل داخلي من الأعلى،
-   لمعة داخلية من الأسفل، وملء أغمق من السطح (var(--input)). */
+   لمعة داخلية من الأسفل، وملء أغمق من السطح (var(--input)).
+   طبقات التظليل هنا rgba() عمداً — هي آلية ظل وليست ألوان تصميم. */
 .admin-layout .admin-sunken {
   background-color: var(--input);
   background-image: linear-gradient(

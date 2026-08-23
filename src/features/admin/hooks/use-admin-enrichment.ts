@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiFetch, apiPost } from "@/lib/frontend/api";
+import { apiFetch, apiPost } from "@/lib/frontend/api-client";
 
 /** A row of the pending_enrichment_approvals table. */
 export interface AdminApproval {

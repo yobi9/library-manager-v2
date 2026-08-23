@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { apiFetch } from "@/lib/frontend/api";
+import { apiFetch } from "@/lib/frontend/api-client";
 
 /**
  * Shape of the admin dashboard page state.

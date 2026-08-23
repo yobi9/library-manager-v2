@@ -9,57 +9,36 @@ import { MaintenanceScreen } from "@/shared/components/layout/maintenance-screen
 /**
  * تخطيط الواجهة العامة — يطبّق سياسات الحماية المركزية (protected + maintenance).
  *
- * - `viewer_access_mode === "protected"` → يفرض تسجيل الدخول على الزوار.
- * - `maintenance_mode === true` → يغلق الواجهة العامة أمام غير المدراء فقط.
+ * القرارات كلها في `ViewerAccessService` (قراءة `viewer_access_mode` +
+ * `maintenance_mode`، التحقق من رمز الجلسة، وتتبع الزيارات)؛ هنا فقط جمع
+ * الإدخالات من الكوكيز/الهيدرات والتصرف (عرض صيانة أو إعادة توجيه).
  *
- * @remarks كلا القرارين يُقرآن من قاعدة البيانات في كل طلب (ديناميكي عبر `cookies()`).
+ * @remarks `cookies()` تُستدعى هنا صراحةً لتفرض العرض الديناميكي لكل طلب حتى
+ * تظهر تغييرات قاعدة البيانات فوراً دون إعادة بناء.
  */
 export default async function ViewerLayout({ children }: { children: React.ReactNode }) {
-  const services = getServices();
-  const settings = await services.settings.getAllSettings();
-  const mode = settings["viewer_access_mode"] as string | undefined;
-  const maintenanceMode = settings["maintenance_mode"] === true;
-
   const cookieStore = await cookies();
   const headersList = await headers();
-  const token = cookieStore.get("session_token")?.value;
 
-  const payload = token ? services.auth.verifyToken(token) : null;
-  const isAdmin = payload?.["is_admin"] === true;
+  const services = getServices();
+  const decision = await services.viewerAccess.evaluateAccess({
+    sessionToken: cookieStore.get("session_token")?.value,
+    visitorSessionId:
+      headersList.get("x-visitor-session-id") || cookieStore.get("visitor_session_id")?.value,
+    ip:
+      headersList.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+      headersList.get("x-real-ip") ||
+      "127.0.0.1",
+    userAgent: headersList.get("user-agent") || "",
+  });
 
-  if (maintenanceMode && !isAdmin) {
+  if (decision.maintenanceMode && !decision.isAdmin) {
     return <MaintenanceScreen />;
   }
 
-  if (mode === "protected" && !payload) {
+  if (decision.mode === "protected" && !decision.isAuthenticated) {
     const xUrl = headersList.get("x-url") || "/";
     redirect(`/login?callbackUrl=${encodeURIComponent(xUrl)}`);
-  }
-
-  // Read the visitor session id from the forwarded header (covers the FIRST
-  // visit, since the cookie only exists from the next request onward), falling
-  // back to the cookie.
-  const visitorSessionId =
-    headersList.get("x-visitor-session-id") || cookieStore.get("visitor_session_id")?.value;
-  if (visitorSessionId && !isAdmin) {
-    // التتبع غير حرج (Best-Effort): أي فشل في تسجيل الزيارة (تعارض مؤقت مع
-    // كاتب الماسح أو غيرها) يجب ألا يُسقط الصفحة العامة — نلتقط الخطأ ونسجّله
-    // فقط ونكمل عرض الصفحة.
-    try {
-      await services.visitor.trackView({
-        sessionId: visitorSessionId,
-        ip:
-          headersList.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-          headersList.get("x-real-ip") ||
-          "127.0.0.1",
-        userAgent: headersList.get("user-agent") || "",
-      });
-    } catch (error) {
-      console.error(
-        "[ViewerLayout] Visitor tracking failed:",
-        error instanceof Error ? error.message : String(error),
-      );
-    }
   }
 
   return (

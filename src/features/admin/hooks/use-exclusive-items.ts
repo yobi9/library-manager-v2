@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiPut } from "@/lib/frontend/api";
+import { apiPut } from "@/lib/frontend/api-client";
 import {
   useAdminSettings,
   adminSettingsKeys,

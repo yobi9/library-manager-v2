@@ -12,14 +12,16 @@ import { useSeasonEpisodes } from "@/lib/frontend/use-season-episodes";
 import { isSeriesType } from "@/lib/frontend/media-constants";
 import { getPosterUrl, getBackdropUrl } from "@/lib/frontend/image-helpers";
 import { mapMediaToCard, extractGenres, isItemNew } from "@/lib/frontend/media-helpers";
+import { translateMediaType } from "@/lib/frontend/translate";
 import { EpisodeCard } from "@/features/viewer/components/episode-card";
 import { Breadcrumbs } from "@/shared/components/ui/breadcrumbs";
 import { UnifiedMedia } from "@/features/viewer/components/unified-media/unified-media";
 import { UnifiedCard } from "@/features/viewer/components/unified-card/unified-card";
-import { CrewMemberCard } from "@/features/viewer/components/crew-member-card";
-import { CastMemberCard } from "@/features/viewer/components/cast-member-card";
+import { CrewMemberCard } from "@/features/viewer/components/member-cards/CrewMemberCard";
+import { CastMemberCard } from "@/features/viewer/components/member-cards/CastMemberCard";
 import { MediaActions } from "@/features/viewer/components/media-actions";
 import { Badge } from "@/shared/components/ui/badge";
+import { Button } from "@/shared/components/ui/button";
 import { AlertCircle, ChevronDown, ChevronUp } from "lucide-react";
 import { ROUTES } from "@/shared/constants";
 import { CAST_DEFAULT_COUNT, CREW_DEFAULT_COUNT } from "@/shared/constants/crew-roles";
@@ -39,13 +41,15 @@ import { SectionHeader } from "@/features/viewer/components/section-header";
  */
 function ExpandToggle({ expanded, onClick }: { expanded: boolean; onClick: () => void }) {
   return (
-    <button
+    <Button
+      variant="link"
+      size="sm"
       onClick={onClick}
-      className="text-primary flex items-center gap-0.5 text-xs font-medium transition-all hover:gap-1"
+      className="gap-0.5 p-0 text-xs font-medium transition-all hover:gap-1"
     >
       {expanded ? "إخفاء" : "عرض الكل"}
       {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-    </button>
+    </Button>
   );
 }
 
@@ -72,9 +76,9 @@ function SeasonEpisodesSection({
       <div className="mb-4 flex items-center justify-between">
         <h3 className="text-lg font-bold">{seasonTitle || "الحلقات"}</h3>
         {episodes.length > 0 && (
-          <span className="bg-primary/10 text-primary rounded-full px-3 py-1 text-xs font-bold">
+          <Badge variant="count" className="px-3 py-0.5">
             {episodes.length} حلقة
-          </span>
+          </Badge>
         )}
       </div>
 
@@ -185,12 +189,9 @@ export default function ItemDetailPage() {
         <div className="flex flex-col items-center gap-4 py-20">
           <AlertCircle className="text-destructive h-12 w-12" />
           <p className="text-destructive">{error?.message ?? "غير موجود"}</p>
-          <button
-            onClick={() => router.refresh()}
-            className="bg-primary text-primary-foreground rounded-md px-4 py-2"
-          >
+          <Button variant="default" onClick={() => router.refresh()}>
             إعادة المحاولة
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -249,13 +250,18 @@ export default function ItemDetailPage() {
 
             <div className="flex flex-col gap-3 text-center md:text-start">
               <div className="flex flex-col gap-3">
-                <h1 className="text-2xl font-bold sm:text-3xl lg:text-4xl">{title}</h1>
+                <h1
+                  title={title}
+                  className="text-foreground line-clamp-1 w-full cursor-pointer text-xl font-bold tracking-tight transition-all duration-300 hover:line-clamp-none sm:text-2xl"
+                >
+                  {title}
+                </h1>
 
                 <div className="flex flex-wrap justify-center gap-1.5 md:justify-start">
-                  <Badge variant="default">{media.type}</Badge>
+                  <Badge variant="secondary">{translateMediaType(media.type)}</Badge>
                   {year && (
                     <Link href={ROUTES.YEAR_ITEMS(String(year)) as import("next").Route}>
-                      <Badge variant="secondary" className="hover:bg-secondary/80 cursor-pointer">
+                      <Badge variant="secondary">
                         {year}
                       </Badge>
                     </Link>
@@ -267,7 +273,7 @@ export default function ItemDetailPage() {
                       if (daysDiff <= 7)
                         return (
                           <Link href="/new">
-                            <Badge variant="secondary" className="animate-pulse">
+                            <Badge variant="new">
                               جديد
                             </Badge>
                           </Link>
@@ -278,7 +284,6 @@ export default function ItemDetailPage() {
                   {media.certification && (
                     <Badge
                       variant="destructive"
-                      className="hover:bg-destructive/80 cursor-pointer"
                       onClick={() =>
                         router.push(
                           `/certification/${encodeURIComponent(String(media.certification))}` as import("next").Route,
@@ -289,7 +294,7 @@ export default function ItemDetailPage() {
                     </Badge>
                   )}
                   {rating > 0 && (
-                    <Badge variant="default" className="bg-rating-star/20 text-rating-star">
+                    <Badge variant="rating">
                       ★ {Number(rating).toFixed(1)}
                       {Number(media.imdb_votes) > 0 && (
                         <span className="ms-1 text-xs opacity-70">
@@ -320,7 +325,7 @@ export default function ItemDetailPage() {
                         key={g}
                         href={ROUTES.GENRE_ITEMS(g.replace(/\s+/g, "_")) as import("next").Route}
                       >
-                        <Badge variant="outline" className="hover:bg-accent cursor-pointer">
+                        <Badge variant="genre">
                           {g}
                         </Badge>
                       </Link>
@@ -337,9 +342,11 @@ export default function ItemDetailPage() {
                     {overview}
                   </p>
                   {overview.length > 200 && (
-                    <button
+                    <Button
+                      variant="link"
+                      size="sm"
                       onClick={() => setIsOverviewExpanded(!isOverviewExpanded)}
-                      className="text-primary mt-1 flex items-center gap-1 text-xs hover:underline"
+                      className="mt-1 gap-1 p-0 text-xs"
                     >
                       {isOverviewExpanded ? (
                         <>
@@ -350,7 +357,7 @@ export default function ItemDetailPage() {
                           المزيد... <ChevronDown size={12} />
                         </>
                       )}
-                    </button>
+                    </Button>
                   )}
                 </div>
               )}
@@ -374,7 +381,7 @@ export default function ItemDetailPage() {
           {media.cast && media.cast.length > 0 && (
             <div className="border-border/50 border-t pt-5">
               <div className="mb-3 flex items-center justify-between gap-2">
-                <h2 className="text-xl font-bold">
+                <h2 className="text-base font-normal">
                   طاقم التمثيل
                   <span className="text-muted-foreground ms-2 text-sm font-medium">
                     ({media.cast.length})
@@ -400,7 +407,7 @@ export default function ItemDetailPage() {
           {media.crew && media.crew.length > 0 && (
             <div className="border-border/50 mt-6 border-t pt-5">
               <div className="mb-3 flex items-center justify-between gap-2">
-                <h2 className="text-xl font-bold">
+                <h2 className="text-base font-normal">
                   طاقم العمل
                   <span className="text-muted-foreground ms-2 text-sm font-medium">
                     ({media.crew.length})

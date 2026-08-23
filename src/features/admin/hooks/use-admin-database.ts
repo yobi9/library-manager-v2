@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiFetch, apiPost, type ApiResponse } from "@/lib/frontend/api";
+import { apiFetch, apiPost } from "@/lib/frontend/api-client";
 
 export interface DatabaseStats {
   size?: number;
@@ -70,9 +70,8 @@ async function fetchBackups(): Promise<BackupFileInfo[]> {
 async function restoreDatabaseBackup(file: File): Promise<void> {
   const formData = new FormData();
   formData.append("backup", file);
-  const res = await fetch("/api/database/restore", { method: "POST", body: formData });
-  const json = (await res.json()) as ApiResponse<unknown>;
-  if (!res.ok || !json.success) throw new Error(json.error ?? "فشل استعادة النسخة الاحتياطية");
+  const res = await apiPost<unknown>("/api/database/restore", formData);
+  if (!res.success) throw new Error(res.error ?? "فشل استعادة النسخة الاحتياطية");
 }
 
 /**

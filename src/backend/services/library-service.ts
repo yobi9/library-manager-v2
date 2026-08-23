@@ -7,7 +7,7 @@ import fs from "fs/promises";
 import path from "path";
 // في library-service.ts
 // أضف الاستيراد في الأعلى إذا لم يكن موجوداً:
-import { getDatabase } from "../db/db";
+import { getDatabase, runInWriterContext } from "../db/db";
 
 const ALLOWED_TYPES = [
   "main",
@@ -174,6 +174,17 @@ export class LibraryService {
     return targetId;
   }
 
+  /**
+   * ينشئ مكتبة/قسم جديداً بعد التحقق من صحة المدخلات.
+   *
+   * تُنفَّذ كتابة الصف داخل `runInWriterContext` (3.5.7) بحيث تذهب إلى اتصال
+   * الكاتب بدل الاتصال الرئيسي المشترك — كتابة الأدمن اليومية هذه لا تتنافس مع
+   * قراءات العملاء ولا تتصادم مع كاتب الماسح.
+   *
+   * @param data - بيانات المكتبة الخام من الواجهة (name، type، paths، ...).
+   * @returns المكتبة العامة بعد الإنشاء أو `null` عند الفشل.
+   * @throws Error إذا كان الاسم مفقوداً أو النوع غير صالح أو الهدف غير موجود.
+   */
   async createLibrary(data: Record<string, unknown>) {
     if (!data["name"] || !(data["name"] as string).trim())
       throw new Error("Library name is required");
@@ -213,7 +224,7 @@ export class LibraryService {
       is_pinned: this.toBoolean(data["is_pinned"]) ? 1 : 0,
     };
 
-    const created = await this.libraryRepo.create(record);
+    const created = await runInWriterContext(() => this.libraryRepo.create(record));
     const publicLib = this.toPublicLibrary(created as Record<string, unknown>);
     void this.logSystemEvent("library_created", {
       libraryId: publicLib?.library_id,
@@ -223,6 +234,17 @@ export class LibraryService {
     return publicLib;
   }
 
+  /**
+   * يحدّث مكتبة/قسماً قائماً بعد التحقق من صحة النوع والمدخلات.
+   *
+   * تُنفَّذ كتابة الصف داخل `runInWriterContext` (3.5.7) بحيث تذهب إلى اتصال
+   * الكاتب بدل الاتصال الرئيسي المشترك — نفس سبب العزل المذكور في `createLibrary`.
+   *
+   * @param libraryId - معرّف المكتبة المستهدفة.
+   * @param updateData - الحقول المطلوب تعديلها (type، paths، hideSection، ...).
+   * @returns المكتبة العامة بعد التحديث أو `null` عند الفشل.
+   * @throws Error إذا لم توجد المكتبة أو كان النوع غير صالح.
+   */
   async updateLibrary(libraryId: number, updateData: Record<string, unknown>) {
     const existing = (await this.libraryRepo.getById(libraryId)) as
       Record<string, unknown> | undefined;
@@ -281,7 +303,7 @@ export class LibraryService {
     delete data["linkedLibraryId"];
     delete data["imageFile"];
 
-    const updated = await this.libraryRepo.update(libraryId, data);
+    const updated = await runInWriterContext(() => this.libraryRepo.update(libraryId, data));
     const publicLib = this.toPublicLibrary(updated as Record<string, unknown>);
     void this.logSystemEvent("library_updated", {
       libraryId,
@@ -520,89 +542,60 @@ export class LibraryService {
 
 
 /**
- * يحذف مكتبة معينة بصورة نهائية مع كافة البيانات والجداول المرتبطة بها داخل معاملة (Transaction).
- * 
- * تتبع الدالة الخطوات التالية:
+ * يحذف مكتبة معينة بصورة نهائية مع كافة البيانات والجداول المرتبطة بها.
+ *
+ * تُنفَّذ العملية على **اتصال الكاتب** عبر `runInWriterContext` داخل معاملة
+ * واحدة (`libraryRepo.withTransaction` → SAVEPOINT + `withExclusiveTransaction`)
+ * — جزء من خطة العزل 3.5.2 التي تنقل الحذف الثقيل من `BEGIN TRANSACTION` على
+ * الاتصال الرئيسي المشترك، بحيث لا تُحبس طلبات العملاء أثناء حذف مكتبة كبيرة
+ * (القراءات على الاتصال الرئيسي تبقى حرة بفضل WAL).
+ *
+ * تتبع الدالة الخطوات التالية داخل المعاملة:
  * 1. التحقق من وجود المكتبة أولاً عبر الـ Repository.
- * 2. فتح معاملة قاعدة بيانات (`BEGIN TRANSACTION`) لضمان تكامل وسلامة البيانات.
- * 3. حذف البيانات التابعة بالترتيب لتفادي قيود المفاتيح الأجنبية (Foreign Key constraints):
+ * 2. حذف البيانات التابعة بالترتيب لتفادي قيود المفاتيح الأجنبية (Foreign Key constraints):
  *    - ملفات الوسائط (`media_files`)
  *    - الأنواع/التصنيفات (`media_genres`)
  *    - الأشخاص/الممثلين (`media_people`)
  *    - تقدم المستخدمين (`user_progress`)
- *    - المفضلة (`favorites`)
  *    - البلاغات والتقارير (`media_reports`)
  *    - عناصر الوسائط نفسها (`media_items`)
  *    - سجل المكتبة من جدول المكتبات الرئيسي (`libraries`).
- * 4. تأكيد التغييرات (`COMMIT`) في حال النجاح، أو التراجع عنها بالكامل (`ROLLBACK`) في حال حدوث أي خطأ.
- * 5. تسجيل حدث النظام (`logSystemEvent`) بشكل غير متزامن للتوثيق.
+ * 3. تُؤكَّد التغييرات (RELEASE) في حال النجاح، أو يُتراجع عنها (ROLLBACK TO SAVEPOINT) عند أي خطأ.
+ * 4. تسجيل حدث النظام (`logSystemEvent`) بشكل غير متزامن للتوثيق.
+ *
+ * ملاحظة التوافق: جدول المفضلة (`favorites`) كان مُعرّفًا في الكود القديم لكنه مُحذف —
+ * المفضلات تُحفظ حاليًا في `localStorage` على جهاز الكلاينت، لا في قاعدة البيانات.
  *
  * @async
  * @function deleteLibrary
  * @param {number} libraryId - المعرّف الفريد (ID) للمكتبة المراد حذفها.
  * @returns {Promise<{ success: boolean; message: string }>} كائن يحتوي على حالة العملية ورسالة التأكيد.
- * 
+ *
  * @throws {Error} يُرمى خطأ في الحالات التالية:
  * - إذا لم يتم العثور على المكتبة (`Library not found`).
- * - إذا فشل أي استعلام أثناء تنفيذ المعاملة داخل قاعدة البيانات (يتم عمل ROLLBACK تلقائياً وإعادة إلقاء الخطأ).
+ * - إذا فشل أي استعلام أثناء تنفيذ المعاملة (يتم التراجع تلقائياً عن المعاملة وإعادة إلقاء الخطأ).
  */
-
-
-// استبدل دالة deleteLibrary بهذا الكود:
 async deleteLibrary(libraryId: number) {
     const lib = await this.libraryRepo.getById(libraryId);
     if (!lib) throw new Error("Library not found");
 
-    const db = await getDatabase();
-    await db.run("BEGIN TRANSACTION");
+    await runInWriterContext(async () => {
+        await this.libraryRepo.withTransaction(async () => {
+            const db = await getDatabase();
 
-    try {
-        // 1. حذف جميع media_files المرتبطة بالمكتبة
-        await db.run(
-            `DELETE FROM media_files WHERE media_id IN (SELECT media_id FROM media_items WHERE library_id = ?)`,
-            [libraryId]
-        );
+            // حذف جميع media_items المرتبطة بالمكتبة
+            // ON DELETE CASCADE على جميع الجداول الفرعية (media_files, media_genres,
+            // media_people, user_progress, media_reports, pending_enrichment_approvals)
+            // يضمن الحذف التلقائي للبيانات المرتبطة عبر media_id
+            await db.run(
+                `DELETE FROM media_items WHERE library_id = ?`,
+                [libraryId]
+            );
 
-        // 2. حذف جميع media_genres المرتبطة بالمكتبة
-        await db.run(
-            `DELETE FROM media_genres WHERE media_id IN (SELECT media_id FROM media_items WHERE library_id = ?)`,
-            [libraryId]
-        );
-
-        // 3. حذف جميع media_people المرتبطة بالمكتبة
-        await db.run(
-            `DELETE FROM media_people WHERE media_id IN (SELECT media_id FROM media_items WHERE library_id = ?)`,
-            [libraryId]
-        );
-
-        // 4. حذف جميع user_progress المرتبطة بالمكتبة
-        await db.run(
-            `DELETE FROM user_progress WHERE media_id IN (SELECT media_id FROM media_items WHERE library_id = ?)`,
-            [libraryId]
-        );
-
-     
-
-        // 6. حذف جميع media_reports المرتبطة بالمكتبة
-        await db.run(
-            `DELETE FROM media_reports WHERE media_id IN (SELECT media_id FROM media_items WHERE library_id = ?)`,
-            [libraryId]
-        );
-
-        // 7. حذف جميع media_items المرتبطة بالمكتبة
-        await db.run(
-            `DELETE FROM media_items WHERE library_id = ?`,
-            [libraryId]
-        );
-
-        // 8. أخيراً، حذف المكتبة نفسها
-        await this.libraryRepo.delete(libraryId);
-
-        await db.run("COMMIT");
-    } catch (err) {
-        await db.run("ROLLBACK");
-        throw err;
-    }
+            // حذف المكتبة نفسها
+            await this.libraryRepo.delete(libraryId);
+        });
+    });
 
     // تسجيل حدث الحذف
     void this.logSystemEvent("library_deleted", {

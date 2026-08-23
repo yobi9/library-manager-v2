@@ -29,8 +29,7 @@ export class EnrichmentController extends BaseController {
   constructor(
     tmdbEnrichment: TmdbEnrichmentService,
     metadataService: MetadataService,
-    enrichmentMediaRepo: EnrichmentMediaRepository,
-    enrichmentApprovalRepo: EnrichmentApprovalRepository,
+ 
   ) {
     super();
     this.service = tmdbEnrichment;

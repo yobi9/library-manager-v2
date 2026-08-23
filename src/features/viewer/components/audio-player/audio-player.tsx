@@ -14,6 +14,7 @@ import {
   VolumeX,
 } from "lucide-react";
 import type { AudioPlayerProps } from "./types";
+import { Button } from "@/shared/components/ui/button";
 
 /**
  * تنسيق مدة بالثواني إلى صيغة `م:ث` (مثال: 04:05).
@@ -179,55 +180,67 @@ export function AudioPlayer({ tracks, currentIndex, onTrackChange }: AudioPlayer
 
         {/* أزرار التحكم */}
         <div className="flex items-center justify-center gap-6">
-          <button
+          <Button
+            variant="ghost"
+            size="icon-sm"
             onClick={() => onTrackChange(Math.max(0, currentIndex - 1))}
             disabled={currentIndex === 0}
             aria-label="المقطع السابق"
-            className="text-white/70 transition-colors hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
+            className="text-white/70 hover:bg-transparent hover:text-white disabled:opacity-30 [&_svg]:size-5"
           >
-            <SkipBack size={20} />
-          </button>
-          <button
+            <SkipBack />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon-sm"
             onClick={() => {
               if (audioRef.current) audioRef.current.currentTime = 0;
             }}
             aria-label="إعادة المقطع"
-            className="text-white/70 transition-colors hover:text-white"
+            className="text-white/70 hover:bg-transparent hover:text-white [&_svg]:size-5"
           >
-            <RotateCcw size={20} />
-          </button>
-          <button
+            <RotateCcw />
+          </Button>
+          <Button
+            variant="default"
+            size="icon"
             onClick={togglePlay}
             aria-label={isPlaying ? "إيقاف مؤقت" : "تشغيل"}
-            className="bg-primary flex h-12 w-12 items-center justify-center rounded-full text-white shadow-lg transition-transform hover:scale-105"
+            className="h-12 w-12 rounded-full shadow-lg transition-transform hover:scale-105 [&_svg]:size-6"
           >
-            {isPlaying ? <Pause size={24} /> : <Play size={24} />}
-          </button>
-          <button
+            {isPlaying ? <Pause /> : <Play />}
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon-sm"
             onClick={() => {
               if (audioRef.current) audioRef.current.currentTime = duration;
             }}
             aria-label="إنهاء المقطع"
-            className="text-white/70 transition-colors hover:text-white"
+            className="text-white/70 hover:bg-transparent hover:text-white [&_svg]:size-5"
           >
-            <RotateCw size={20} />
-          </button>
-          <button
+            <RotateCw />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon-sm"
             onClick={() => onTrackChange(Math.min(tracks.length - 1, currentIndex + 1))}
             disabled={currentIndex === tracks.length - 1}
             aria-label="المقطع التالي"
-            className="text-white/70 transition-colors hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
+            className="text-white/70 hover:bg-transparent hover:text-white disabled:opacity-30 [&_svg]:size-5"
           >
-            <SkipForward size={20} />
-          </button>
+            <SkipForward />
+          </Button>
           <div className="flex items-center gap-2">
-            <button
+            <Button
+              variant="ghost"
+              size="icon-sm"
               onClick={toggleMute}
               aria-label="كتم الصوت"
-              className="text-white/70 transition-colors hover:text-white"
+              className="text-white/70 hover:bg-transparent hover:text-white [&_svg]:size-5"
             >
-              {muted ? <VolumeX size={20} /> : <Volume2 size={20} />}
-            </button>
+              {muted ? <VolumeX /> : <Volume2 />}
+            </Button>
             <input
               type="range"
               min={0}

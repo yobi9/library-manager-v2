@@ -1,3 +1,5 @@
+import type { ExclusiveSettingItem } from "@/shared/types/settings";
+
 /**
  * عنصر حصري (Hero) يُعرض في شريط المحتوى الحصري أعلى الصفحة الرئيسية.
  *
@@ -6,15 +8,18 @@
  * (title/desc/image/...) هي نسخة احتياطية (fallback) تُستخدم في حال غياب
  * تفاصيل الـ API أو غياب الاتصال.
  *
- * مصدر الحقيقة: حقول `exclusive_items` في `PublicSettings` (src/lib/frontend/api-media.ts)
+ * مصدر الحقيقة: `ExclusiveSettingItem` في
+ * `@/shared/types/settings` (عقد `exclusive_items` في `PublicSettings`) —
  * و `SettingsService.getPublicSettings()` (src/backend/services/settings-service.ts).
+ * هذا النوع يوسّع `ExclusiveSettingItem` بحقول لوحة الأدمن فقط (id/video_url/rating/year)
+ * مع تضييق `media_id` و `sort_order` للأشكال الفعلية المحفوظة من لوحة الإدارة.
  *
  * النطاق: لا يشمل التفاصيل الكاملة للطاقم/الممثلين — الـ Viewer يجلبها حياً
  * عبر `GET /api/media/:id` عند الحاجة.
  *
  * القيود: `sort_order` هو فهرس العرض (0..n) ويُعاد حسابه عند كل إعادة ترتيب.
  */
-export interface ExclusiveItem {
+export interface ExclusiveItem extends ExclusiveSettingItem {
   /** معرّف فريد محلي للعنصر الحصري (ليس معرّف الوسيط). */
   id: string;
   /** معرّف الوسيط في المكتبة — المرجع الأساسي عند عرض التفاصيل الحية. */

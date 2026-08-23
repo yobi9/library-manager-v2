@@ -169,13 +169,10 @@ export function MessagesPage() {
           </div>
         ) : (
           displayItems.map((msg) => (
-            <div
-              key={msg.id}
-              className="border-border bg-card rounded-lg border p-4 space-y-3"
-            >
+            <div key={msg.id} className="border-border bg-card space-y-3 rounded-lg border p-4">
               {/* المعلومات الأساسية */}
               <div className="flex items-center justify-between gap-2">
-                <span className="text-foreground text-sm font-medium truncate">
+                <span className="text-foreground truncate text-sm font-medium">
                   {msg.name || "—"}
                 </span>
                 <Badge
@@ -195,13 +192,13 @@ export function MessagesPage() {
               <div className="space-y-2">
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-muted-foreground text-xs">البريد</span>
-                  <span className="text-secondary-foreground text-xs truncate">
+                  <span className="text-secondary-foreground truncate text-xs">
                     {msg.email || "—"}
                   </span>
                 </div>
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-muted-foreground text-xs">الموضوع</span>
-                  <span className="text-secondary-foreground text-xs truncate max-w-[200px]">
+                  <span className="text-secondary-foreground max-w-50 truncate text-xs">
                     {msg.subject || "بدون موضوع"}
                   </span>
                 </div>
@@ -257,26 +254,26 @@ export function MessagesPage() {
       </div>
 
       {/* ─── Table View (الديسكتوب: lg+) ────────────────────────── */}
-      <div className="hidden border-border bg-card overflow-hidden rounded-xl border shadow-sm lg:block">
+      <div className="border-border bg-card hidden overflow-hidden rounded-xl border shadow-sm lg:block">
         <table className="w-full">
           <thead className="bg-secondary/50">
             <tr className="border-border border-b hover:bg-transparent">
-              <th className="text-muted-foreground py-2.5 px-4 text-right text-xs font-medium">
+              <th className="text-muted-foreground px-4 py-2.5 text-right text-xs font-medium">
                 المرسل
               </th>
-              <th className="text-muted-foreground py-2.5 px-4 text-right text-xs font-medium">
+              <th className="text-muted-foreground px-4 py-2.5 text-right text-xs font-medium">
                 البريد الإلكتروني
               </th>
-              <th className="text-muted-foreground py-2.5 px-4 text-right text-xs font-medium">
+              <th className="text-muted-foreground px-4 py-2.5 text-right text-xs font-medium">
                 الموضوع
               </th>
-              <th className="text-muted-foreground py-2.5 px-4 text-right text-xs font-medium">
+              <th className="text-muted-foreground px-4 py-2.5 text-right text-xs font-medium">
                 الحالة
               </th>
-              <th className="text-muted-foreground py-2.5 px-4 text-right text-xs font-medium">
+              <th className="text-muted-foreground px-4 py-2.5 text-right text-xs font-medium">
                 التاريخ
               </th>
-              <th className="text-muted-foreground py-2.5 px-4 text-center text-xs font-medium">
+              <th className="text-muted-foreground px-4 py-2.5 text-center text-xs font-medium">
                 الإجراءات
               </th>
             </tr>
@@ -294,16 +291,16 @@ export function MessagesPage() {
                   key={msg.id}
                   className="border-border/50 hover:bg-bg-hover/50 border-b transition-colors"
                 >
-                  <td className="text-foreground py-2.5 px-4 text-sm font-medium">
+                  <td className="text-foreground px-4 py-2.5 text-sm font-medium">
                     {msg.name || "—"}
                   </td>
-                  <td className="text-secondary-foreground py-2.5 px-4 text-sm">
+                  <td className="text-secondary-foreground px-4 py-2.5 text-sm">
                     {msg.email || "—"}
                   </td>
-                  <td className="text-foreground max-w-xs truncate py-2.5 px-4 text-sm">
+                  <td className="text-foreground max-w-xs truncate px-4 py-2.5 text-sm">
                     {msg.subject || "بدون موضوع"}
                   </td>
-                  <td className="py-2.5 px-4">
+                  <td className="px-4 py-2.5">
                     <Badge
                       variant={msg.status === "read" ? "default" : "secondary"}
                       className={cn(
@@ -316,7 +313,7 @@ export function MessagesPage() {
                       {msg.status === "read" ? "مقروء" : "غير مقروء"}
                     </Badge>
                   </td>
-                  <td className="text-muted-foreground py-2.5 px-4 text-xs">
+                  <td className="text-muted-foreground px-4 py-2.5 text-xs">
                     {msg.created_at
                       ? new Date(msg.created_at).toLocaleDateString("ar-SA", {
                           year: "numeric",
@@ -325,7 +322,7 @@ export function MessagesPage() {
                         })
                       : "—"}
                   </td>
-                  <td className="py-2.5 px-4">
+                  <td className="px-4 py-2.5">
                     <div className="flex items-center justify-center gap-0.5">
                       <Button
                         variant="ghost"
@@ -444,7 +441,11 @@ export function MessagesPage() {
             <Button variant="outline" onClick={() => setSendModalOpen(false)}>
               إلغاء
             </Button>
-            <Button onClick={handleSendMessage} disabled={createMutation.isPending} className="gap-2">
+            <Button
+              onClick={handleSendMessage}
+              disabled={createMutation.isPending}
+              className="gap-2"
+            >
               <Send className="h-4 w-4" />
               {createMutation.isPending ? "جاري الإرسال..." : "إرسال"}
             </Button>

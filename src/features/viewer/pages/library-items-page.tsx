@@ -1,3 +1,4 @@
+//src\features\viewer\pages\library-items-page.tsx
 "use client";
 
 import { useMemo, useState, useEffect, useRef, useCallback } from "react";
@@ -9,13 +10,13 @@ import {
   useBreadcrumbs,
 } from "@/lib/frontend/media-queries";
 import { LibraryFilters } from "@/shared/components/layout/library-filters";
-import { MediaCard } from "@/features/viewer/components/media-card/media-card";
-import { MediaGrid } from "@/shared/components/ui/media-grid";
+import { UnifiedMedia } from "@/features/viewer/components/unified-media/unified-media";
 import { Breadcrumbs } from "@/shared/components/ui/breadcrumbs";
+import { Button } from "@/shared/components/ui/button";
 import { Spinner } from "@/shared/components/ui/spinner";
 import { ROUTES } from "@/shared/constants";
 import { Film, AlertCircle } from "lucide-react";
-import { extractGenres, isItemNew } from "@/lib/frontend/media-helpers";
+import { mapMediaToCard } from "@/lib/frontend/media-helpers";
 
 const SORT_OPTIONS = [
   { value: "recent", label: "تاريخ الإضافة" },
@@ -68,7 +69,10 @@ export default function LibraryItemsPage() {
     isLoading: itemsLoading,
     isError: itemsError,
     error: itemsErrorDetail,
-  } = useLibraryItems(numericId, filters);
+  } = useLibraryItems(numericId, filters, {
+    initialLimit: 24,
+    subsequentLimit: 12,
+  });
 
   const yearOptions = useMemo(() => {
     const currentYear = new Date().getFullYear();
@@ -118,15 +122,10 @@ export default function LibraryItemsPage() {
   if (isInfoLoading || itemsLoading) {
     return (
       <div className="mx-auto max-w-7xl space-y-4 px-3 py-4 sm:space-y-6 sm:px-4 sm:py-6 md:px-6 md:py-8 lg:px-8">
-        <div className="flex items-center gap-2">
-          <Spinner />
-          <span className="text-muted-foreground">جاري تحميل المكتبة...</span>
+        <div className="flex items-center justify-center py-4">
+          <Spinner size="lg" label="جاري تحميل المكتبة..." labelPosition="bottom" />
         </div>
-        <MediaGrid>
-          {Array.from({ length: 12 }).map((_, i) => (
-            <div key={i} className="bg-muted aspect-2/3 animate-pulse rounded-lg" />
-          ))}
-        </MediaGrid>
+        <UnifiedMedia mode="grid" isLoading skeletonCount={12} />
       </div>
     );
   }
@@ -137,12 +136,9 @@ export default function LibraryItemsPage() {
         <div className="flex flex-col items-center gap-4 py-20">
           <AlertCircle className="text-destructive h-12 w-12" />
           <p className="text-destructive">فشل تحميل معلومات المكتبة</p>
-          <button
-            onClick={() => router.refresh()}
-            className="bg-primary text-primary-foreground rounded-md px-4 py-2"
-          >
+          <Button variant="default" onClick={() => router.refresh()}>
             إعادة المحاولة
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -156,12 +152,9 @@ export default function LibraryItemsPage() {
           <p className="text-destructive">
             فشل تحميل العناصر: {itemsErrorDetail?.message ?? "خطأ غير معروف"}
           </p>
-          <button
-            onClick={() => router.refresh()}
-            className="bg-primary text-primary-foreground rounded-md px-4 py-2"
-          >
+          <Button variant="default" onClick={() => router.refresh()}>
             إعادة المحاولة
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -170,7 +163,6 @@ export default function LibraryItemsPage() {
   const libraryName = libraryInfo?.details?.name ?? "";
 
   return (
-    //<div className="mx-auto max-w-7xl space-y-4 sm:space-y-6 px-4 py-6">
     <div className="mx-auto max-w-7xl space-y-4 px-3 py-4 sm:space-y-6 sm:px-4 sm:py-6 md:px-6 md:py-8 lg:px-8">
       <Breadcrumbs
         items={[{ label: "الأقسام", href: ROUTES.SECTIONS }, ...breadcrumbItems.slice(1)]}
@@ -201,30 +193,19 @@ export default function LibraryItemsPage() {
       {allItems.length === 0 && !itemsLoading && !isFetchingNextPage ? (
         <div className="text-muted-foreground py-20 text-center">لا توجد نتائج</div>
       ) : (
-        <MediaGrid>
-          {allItems.map((item) => (
-            <MediaCard
-              key={String(item.media_id ?? item.id)}
-              id={String(item.media_id ?? item.id)}
-              title={item.display_title ?? item.title ?? item.name ?? ""}
-              type={item.type ?? ""}
-              year={String(item.year ?? "")}
-              rating={Number(item.rating ?? item.imdb_rating) || 0}
-              certification={item.certification || item.age_rating || undefined}
-              duration={item.duration ?? item.runtime ?? undefined}
-              views={item.views ?? undefined}
-              seasonsCount={item.seasons_count ?? item.seasonsCount ?? undefined}
-              episodesCount={item.episodes_count ?? item.episodesCount ?? undefined}
-              genres={extractGenres(item)}
-              isNew={isItemNew(item.created_at ?? item.createdAt)}
-            />
-          ))}
-        </MediaGrid>
+        <UnifiedMedia mode="grid" items={allItems} mapItemToProps={mapMediaToCard} />
       )}
 
       {hasNextPage && (
         <div ref={loadMoreRef} className="text-muted-foreground animate-pulse py-20 text-center">
-          {isFetchingNextPage ? "جاري تحميل المزيد..." : "حمّل المزيد"}
+          {isFetchingNextPage ? (
+            <span className="flex items-center justify-center gap-2">
+              <Spinner size="sm" />
+              جاري تحميل المزيد...
+            </span>
+          ) : (
+            "حمّل المزيد"
+          )}
         </div>
       )}
     </div>

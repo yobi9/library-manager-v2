@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiFetch, apiPut } from "@/lib/frontend/api";
+import { apiFetch, apiPut } from "@/lib/frontend/api-client";
 
 export interface ReportItem {
   id: number;

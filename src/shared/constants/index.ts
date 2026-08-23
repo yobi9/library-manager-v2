@@ -4,6 +4,7 @@ export const APP_DESCRIPTION = "منصة بث الوسائط";
 export const ROUTES = {
   HOME: "/",
   LOGIN: "/login",
+    NEW: "/new", // <-- إضافة هذا السطر
   ITEMS: "/items",
   ITEM_VIEW: (type: string, id: string) => `/itemView/${type}/${id}`,
   PLAYER: (id: string) => `/player/${id}`,
@@ -30,14 +31,13 @@ export const ROUTES = {
   ADMIN_EVENTS: "/admin/events",
   ADMIN_PROCESSES: "/admin/processes",
   ADMIN_SETTINGS: "/admin/settings",
-  ADMIN_LIVE_STREAM: "/admin/live-stream", // أو "#" حسب الرغبة
+  ADMIN_LIVE_STREAM: "/admin/live-stream",
   ADMIN_LIBRARIES: "/admin/libraries",
   ADMIN_MEDIA: "/admin/items-control",
   ADMIN_EXCLUSIVE: "/admin/exclusive",
+  ADMIN_PARENTAL: "/admin/parental",
   ADMIN_NEWS: "/admin/news",
   ADMIN_MESSAGES: "/admin/messages",
-  ADMIN_STORE: "/admin/store",
-  ADMIN_ADS: "/admin/ads",
   ADMIN_USERS: "/admin/users",
   ADMIN_REQUESTS: "/admin/requests",
   ADMIN_REPORTS: "/admin/reports",
@@ -49,25 +49,6 @@ export const ROUTES = {
   ADMIN_SUBSCRIPTION: "/admin/subscription",
 } as const;
 
-export const API_ROUTES = {
-  MEDIA: "/api/media",
-  LIBRARIES: "/api/libraries",
-  USERS: "/api/users",
-  SETTINGS: "/api/settings",
-  AUTH: "/api/auth",
-} as const;
-
-export const PAGINATION = {
-  DEFAULT_PAGE: 1,
-  DEFAULT_LIMIT: 20,
-  MAX_LIMIT: 100,
-} as const;
-
-export const USER_ROLES = {
-  ADMIN: "admin",
-  VIEWER: "viewer",
-} as const;
-
 /**
  * [Domain] المسارات الاحتياطية الافتراضية لصور الوسائط (Placeholders).
  *
@@ -76,7 +57,7 @@ export const USER_ROLES = {
  * - مصدر الحقيقة: تطابق ملفات SVG داخل `public/assets/images/placeholders`،
  *   وهي نفس القاعدة المستخدمة في طبقة الخادم (`image-service.ts`) عبر إعداد
  *   `image_placeholder_dir` — عقد مسار موحّد بين العميل والخادم.
- * - النطاق: الاستخدامات الاحتياطية في العميل فقط (library-card، sections-grid،
+ * - النطاق: الاستخدامات الاحتياطية في العميل فقط (library-card، section-card،
  *   search-modal). مسار صور العناصر التفصيلي يعتمد على `/api/images/{id}`
  *   مع بديل من الخادم ولا يمرّ من هنا.
  * - الاكتمال: القائمة كاملة (5 أنواع) ومطابقة لخطة إعادة هيكلة الصور

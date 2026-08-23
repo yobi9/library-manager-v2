@@ -5,7 +5,7 @@ import localFont from "next/font/local"; // 1. استيراد أداة الخط�
 import { Providers } from "@/providers";
 import { APP_NAME, APP_DESCRIPTION } from "@/shared/constants";
 import "./globals.css";
- 
+
 // 2. إعداد خط Estra7ah بأوزانه الثلاثة كمصفوفة داخل كائن واحد
 const estra7ah = localFont({
   src: [
@@ -91,8 +91,8 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
-    { media: "(prefers-color-scheme: dark)", color: "#0a0a0a" },
+    { media: "(prefers-color-scheme: light)", color: "#fafbfc" },
+    { media: "(prefers-color-scheme: dark)", color: "#0a0b0c" },
   ],
 };
 
@@ -117,17 +117,30 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html
-
-    
       lang="ar"
       dir="rtl"
       className={`${estra7ah.variable} ${ibmPlexSansArabic.variable} ${ibmPlexMono.variable} h-full`}
       suppressHydrationWarning
     >
-   
+      {/* 4. قمنا بتغيير الخط الافتراضي في الـ body من font-sans إلى font-estra7ah ليصبح الخط الأساسي للموقع */}
+      {/* <body
+  className="bg-background font-estra7ah text-foreground flex min-h-full flex-col antialiased"
+  suppressHydrationWarning
+>
+     
+ 
+        <Providers>{children}</Providers>
+      </body> */}
 
-      <body className="bg-background font-estra7ah text-foreground flex min-h-full flex-col antialiased">
-        {/* 4. قمنا بتغيير الخط الافتراضي في الـ body من font-sans إلى font-estra7ah ليصبح الخط الأساسي للموقع */}
+      <body
+        className="bg-background font-estra7ah text-foreground flex min-h-full flex-col antialiased"
+        suppressHydrationWarning
+      >
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){var p=location.pathname;if(p.startsWith("/admin")||p.startsWith("/login")){var t=localStorage.getItem("admin_dashboard_theme")||"dark";document.body.classList.add("admin-layout");document.body.dataset.theme=t}})()`,
+          }}
+        />
         <Providers>{children}</Providers>
       </body>
     </html>

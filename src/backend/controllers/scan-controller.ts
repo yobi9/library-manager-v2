@@ -1,15 +1,39 @@
 import { BaseController, type ControllerResult } from "./base-controller";
 import type { ScanOrchestrator } from "../scanner/scan-orchestrator";
 import type { LibraryService } from "../services/library-service";
-import type { LibraryRecord, LibraryType } from "../scanner/scanner-events";
+import type { LibraryMonitor } from "../scanner/LibraryMonitor";
+import type { LibraryRecord, LibraryType, ScanStatus } from "../scanner/scanner-events";
 import { ScanAlreadyRunningError } from "../scanner/scan-errors";
-import { getServices } from "../services";
 import { logger } from "../observability/logger";
+
+/**
+ * صف حالة مسح مكتبة واحدة كما تعرضه صفحة «العمليات الخلفية» الإدارية.
+ *
+ * `scanned_items` = مجموع العناصر المعالجة (`mediaAdded + mediaUpdated + mediaSkipped`)
+ * من إحصاءات الفحص الجاري؛ و`total_items` تُملأ فقط عند انتهاء الفحص
+ * (completed/stopped/failed) لأن الماسح لا يعرف العدد الكلي مسبقاً أثناء المسح؛
+ * و`progress` = 100 عند الانتهاء و0 أثناء العمل أو الخمول.
+ */
+export interface ScanProcessRow {
+  /** معرّف المكتبة في جدول `libraries`. */
+  library_id: number;
+  /** اسم المكتبة كما يظهر في واجهة الأدمن. */
+  library_name: string;
+  /** حالة الفحص الحالية لهذه المكتبة (`ScanStatus`). */
+  status: ScanStatus;
+  /** نسبة الإنجاز (0..100) — لا تُملأ أثناء المسح لأن الماسح بلا مقام كلي. */
+  progress: number;
+  /** عدد العناصر التي عالجها الفحص حتى اللحظة. */
+  scanned_items: number;
+  /** العدد الكلي المعروف عند الانتهاء، أو 0 أثناء المسح (غير معروف بعد). */
+  total_items: number;
+}
 
 export class ScanController extends BaseController {
   constructor(
     private scanner: ScanOrchestrator,
     private libraryService: LibraryService,
+    private libraryMonitor: LibraryMonitor,
   ) {
     super();
   }
@@ -81,8 +105,7 @@ export class ScanController extends BaseController {
     forceRescan?: boolean;
   }): Promise<ControllerResult> {
     try {
-      const services = getServices();
-      const libraries = await services.library.getAllActive();
+      const libraries = await this.libraryService.getAllActive();
       if (libraries.length === 0) return this.ok([], "No active libraries to scan");
 
       this.scanner.prepareScanAll();
@@ -110,6 +133,52 @@ export class ScanController extends BaseController {
       const libraryId = this.parseId(id);
       const progress = this.scanner.getProgress(libraryId);
       return this.ok(progress);
+    } catch (err) {
+      return this.handleError(err);
+    }
+  }
+
+  /**
+   * يجمع حالات المسح لكل المكتبات النشطة بصيغة صفحة «العمليات الخلفية».
+   *
+   * المكتبة النشطة التي لا يوجد لها `ScanState` جارٍ (لم تُمسح بعد، أو مسحها
+   * القديم انتهى) تُرجع بالحالة `idle` حتى تظهر أزرار التحكم الخاصة بها.
+   *
+   * @returns كائن `{ rows, total }` حيث `rows` مصفوفة `ScanProcessRow` لكل مكتبة نشطة.
+   */
+  async getProcesses() {
+    try {
+      const libraries = await this.libraryService.getAllActive();
+      const rows: ScanProcessRow[] = libraries
+        .filter((lib): lib is NonNullable<typeof lib> => lib !== null)
+        .map((lib) => {
+        const libraryId = Number(lib["library_id"]);
+        const libraryName = String(lib["name"]);
+        const state = this.scanner.getState(libraryId);
+        if (!state) {
+          return {
+            library_id: libraryId,
+            library_name: libraryName,
+            status: "idle" as const,
+            progress: 0,
+            scanned_items: 0,
+            total_items: 0,
+          };
+        }
+        const scanned =
+          state.stats.mediaAdded + state.stats.mediaUpdated + state.stats.mediaSkipped;
+        const finished =
+          state.status === "completed" || state.status === "stopped" || state.status === "failed";
+        return {
+          library_id: state.libraryId,
+          library_name: state.libraryName,
+          status: state.status,
+          progress: finished ? 100 : 0,
+          scanned_items: scanned,
+          total_items: finished ? scanned : 0,
+        };
+      });
+      return this.ok({ rows, total: rows.length });
     } catch (err) {
       return this.handleError(err);
     }
@@ -151,6 +220,30 @@ export class ScanController extends BaseController {
     try {
       const result = await this.scanner.validateAll();
       return this.ok(result);
+    } catch (err) {
+      return this.handleError(err);
+    }
+  }
+
+  /**
+   * يُفعّل أو يُعطّل مراقب الملفات (`LibraryMonitor`) لمكتبة معينة ويزامن
+   * علامة `is_watched` في جدول المكتبات مع حالة المراقب.
+   *
+   * @param id - معرّف المكتبة المراد تغيير حالة مراقبتها.
+   * @param active - `true` لبدء المراقبة، `false` لإيقافها.
+   * @returns رسالة تأكيد النجاح (Watcher enabled/disabled).
+   */
+  async setWatcher(id: string, active: boolean) {
+    try {
+      const libraryId = this.parseId(id);
+      if (active) {
+        await this.libraryMonitor.watchLibrary(libraryId);
+        await this.libraryService.updateLibrary(libraryId, { is_watched: true } as Record<string, unknown>);
+      } else {
+        await this.libraryMonitor.unwatchLibrary(libraryId);
+        await this.libraryService.updateLibrary(libraryId, { is_watched: false } as Record<string, unknown>);
+      }
+      return this.ok(undefined, active ? "Watcher enabled" : "Watcher disabled");
     } catch (err) {
       return this.handleError(err);
     }

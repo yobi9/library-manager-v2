@@ -12,8 +12,8 @@ import {
   Settings,
   UploadCloud,
   Tv,
-  ShoppingCart,
-  Megaphone,
+
+
   Newspaper,
   Mail,
   ListOrdered,
@@ -61,6 +61,7 @@ const navSections: NavSection[] = [
     items: [
       { label: "ترتيب الأقسام", href: ROUTES.ADMIN_LIBRARIES, icon: ListOrdered },
       { label: "التحكم بالعناصر", href: ROUTES.ADMIN_MEDIA, icon: Sliders },
+      { label: "التحكم بالوصول", href: ROUTES.ADMIN_PARENTAL, icon: ShieldCheck },
     ],
   },
   {
@@ -71,13 +72,7 @@ const navSections: NavSection[] = [
       { label: "الرسائل", href: ROUTES.ADMIN_MESSAGES, icon: Mail },
     ],
   },
-  {
-    title: "المتجر والتسويق",
-    items: [
-      { label: "المتجر", href: ROUTES.ADMIN_STORE, icon: ShoppingCart },
-      { label: "الإعلانات", href: ROUTES.ADMIN_ADS, icon: Megaphone },
-    ],
-  },
+
   {
     title: "المستخدمين",
     items: [

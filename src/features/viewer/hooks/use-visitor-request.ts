@@ -1,4 +1,5 @@
 import { useMutation } from "@tanstack/react-query";
+import { apiPost } from "@/lib/frontend/api-client";
 import { getDeviceId } from "@/shared/utils/device";
 
 /**
@@ -13,18 +14,9 @@ import { getDeviceId } from "@/shared/utils/device";
 async function submitVisitorRequest(message: string): Promise<void> {
   const userId = getDeviceId();
   if (!userId) throw new Error("تعذر تحديد هوية الجهاز");
-  const res = await fetch("/api/user/requests", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ userId, message }),
-  });
-  const data = (await res.json()) as {
-    success: boolean;
-    error?: string;
-    message?: string;
-  };
-  if (!res.ok || !data.success) {
-    throw new Error(data.error ?? "فشل إرسال الطلب");
+  const res = await apiPost("/api/user/requests", { userId, message });
+  if (!res.success) {
+    throw new Error(res.error ?? "فشل إرسال الطلب");
   }
 }
 

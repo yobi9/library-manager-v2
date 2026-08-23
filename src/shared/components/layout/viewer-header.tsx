@@ -68,10 +68,7 @@ export function ViewerHeader() {
 
   return (
     <>
-      {/* <header className="border-border/10 bg-background/80 supports-backdrop-filter:bg-background/60 fixed inset-x-0 top-0 z-40 border-b backdrop-blur-lg">
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4"> */}
-      <header className="border-border/10 bg-background/80 supports-backdrop-filter:bg-background/60 fixed inset-x-0 top-0 z-40 border-b backdrop-blur-xl transition-colors duration-300">
-        {/* <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6"> */}
+      <header className="border-border/10 bg-background/80 supports-backdrop-filter:bg-background/60 fixed inset-x-0 top-0 z-50 border-b backdrop-blur-xl transition-colors duration-300">
         <div className="container mx-auto flex h-16 items-center justify-between px-3 sm:px-4 md:px-6 lg:px-8">
           <Link
             href={ROUTES.HOME as import("next").Route}
@@ -85,7 +82,7 @@ export function ViewerHeader() {
           <nav className="hidden items-center gap-4 lg:flex">
             <Button
               variant="ghost"
-              className="text-foreground hover:text-foreground hover:bg-white/10"
+              className="text-foreground hover:text-foreground hover:bg-bg-hover"
               onClick={() => setSearchOpen(true)}
             >
               <Search className="h-4 w-4" />
@@ -212,7 +209,9 @@ export function ViewerHeader() {
                 ) : (
                   <div className="h-4 w-4" />
                 )}
-                <span>{mounted ? (resolvedTheme === "dark" ? "الوضع الفاتح" : "الوضع الداكن") : ""}</span>
+                <span>
+                  {mounted ? (resolvedTheme === "dark" ? "الوضع الفاتح" : "الوضع الداكن") : ""}
+                </span>
               </Button>
               <Button
                 variant="outline"
@@ -236,7 +235,7 @@ export function ViewerHeader() {
         <ModalContent>
           <ModalHeader>
             <ModalTitle>طلب محتوى</ModalTitle>
-            <ModalDescription>أرسل طلبك لإضاف محتوى جديد</ModalDescription>
+            <ModalDescription>أرسل طلبك لإضافة محتوى جديد</ModalDescription>
           </ModalHeader>
           <div className="space-y-4 py-4">
             <Textarea

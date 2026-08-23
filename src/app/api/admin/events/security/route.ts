@@ -1,11 +1,11 @@
 import { NextRequest } from "next/server";
-import { getServices } from "@/backend/services";
 import {
   requireAdmin,
   getQueryNumber,
   toNextResponse,
   handleRouteError,
 } from "@/backend/api/route-helpers";
+import { getControllers } from "@/backend/controllers";
 
 /**
  * Serves the persisted security events from the `security_events` table
@@ -23,17 +23,8 @@ export async function GET(request: NextRequest) {
     const limit = getQueryNumber(request, "limit", 50) ?? 50;
     const offset = getQueryNumber(request, "offset", 0) ?? 0;
 
-    const services = getServices();
-    const [rows, total] = await Promise.all([
-      services.security.getAllSecurityEvents(limit, offset),
-      services.security.countEvents(),
-    ]);
-
-    return toNextResponse({
-      success: true,
-      status: 200,
-      data: { rows, total },
-    });
+    const { events } = getControllers();
+    return toNextResponse(await events.getSecurityEvents(limit, offset));
   } catch (error) {
     return handleRouteError(error);
   }

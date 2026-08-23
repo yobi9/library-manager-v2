@@ -1,5 +1,5 @@
 import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiFetch, apiDelete } from "@/lib/frontend/api";
+import { apiFetch, apiDelete } from "@/lib/frontend/api-client";
 
 /**
  * Event row as persisted in the `activities` table and returned by the

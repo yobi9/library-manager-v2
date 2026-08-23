@@ -1,6 +1,5 @@
-//src\features\admin\hooks\use-admin-messages.ts
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiFetch, apiPost, apiPut, apiDelete } from "@/lib/frontend/api";
+import { apiFetch, apiPost, apiPut, apiDelete } from "@/lib/frontend/api-client";
 
 export interface MessageItem {
   id: number;

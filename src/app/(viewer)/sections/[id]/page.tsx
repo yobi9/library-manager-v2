@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { SectionsGrid } from "@/shared/components/layout/sections-grid";
+import { SectionsGrid } from "@/features/viewer/components/sections/sections-grid";
 
 export default function ContainerPage() {
   const { id } = useParams<{ id: string }>();
