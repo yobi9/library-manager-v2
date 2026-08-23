@@ -34,7 +34,9 @@
 /screenshots/
 /screenshot-*.mjs
 .vscode/
+.opencode/
 .opencode/audits/screenshots/
+/installer/
  
 # debug
 npm-debug.log*
