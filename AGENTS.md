@@ -73,7 +73,7 @@ Library/media manager: Next.js 16 (App Router, `output: "standalone"`), React 19
 
 ## Database
 
-* Native sqlite3; WAL mode. Path from `DATABASE_URL`/`DB_PATH`, else win32 `%PROGRAMDATA%\LibraryManager\media_library.db`, else `./data/media_library.db`.
+* Native sqlite3; WAL mode. Path from `DATABASE_URL`/`DB_PATH`, else win32 `%PROGRAMDATA%\Youbi\media_library.db`, else `./data/media_library.db`.
 * Writer context: scanner/background writes must use `runInWriterContext`. During an active scan, background jobs skip to avoid `SQLITE_BUSY`.
 * Migrations: numbered SQL files `src/backend/db/migrations/NNN_*.sql`. Never edit an applied migration; the standalone build does NOT include them — `scripts/build-release.mjs` copies them.
 

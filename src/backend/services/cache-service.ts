@@ -426,7 +426,7 @@ export class CacheService {
 }
 
 /** مفتاح تخزين مثيل الكاش على `globalThis`. */
-const CACHE_INSTANCE_STATE_KEY = "__libraryManagerCacheInstance";
+const CACHE_INSTANCE_STATE_KEY = "__youbi_cache_instance";
 
 const globalCacheInstance = (globalThis as Record<string, unknown>)[CACHE_INSTANCE_STATE_KEY] as
   CacheService | null | undefined;

@@ -3,6 +3,8 @@
  * Assembles a self-contained production release directory from the Next.js
  * standalone build output, then optionally packages it into a portable ZIP.
  *
+ * Product identity: Youbi.
+ *
  * Layout produced at `release/app/`:
  *
  *   server.js              ← Next.js standalone entry
@@ -12,7 +14,8 @@
  *   nssm.exe                ← service runner (from tools/)
  *   public/                 ← static assets (fonts, placeholders, library images)
  *   src/backend/db/migrations/  ← SQL migrations (NOT auto-included by standalone)
- *   data/                   ← DB snapshot + licenses (from existing data/)
+ *   data/                   ← empty runtime dir (.gitkeep only); Fresh DB is
+ *                             created automatically on first boot
  *   .env.production         ← template, overwritten at install time
  *   version.json            ← version metadata for runtime diagnostics
  *
@@ -36,11 +39,11 @@ import {
   statSync,
 } from "node:fs";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 
 const ROOT = join(import.meta.dirname, "..");
 const RELEASE_DIR = join(ROOT, "release", "app");
 const TOOLS_DIR = join(ROOT, "tools");
-const DATA_DIR = join(ROOT, "data");
 const PUBLIC_DIR = join(ROOT, "public");
 const STANDALONE_DIR = join(ROOT, ".next", "standalone");
 const STATIC_DIR = join(ROOT, ".next", "static");
@@ -62,28 +65,49 @@ function ensureDir(dir) {
 }
 
 // ---------------------------------------------------------------------------
-// DB snapshot — copy db + WAL sidecars for a consistent snapshot
+// C-data leak gate — personal development data must never ship
 // ---------------------------------------------------------------------------
 
 /**
- * Copies the SQLite database and WAL sidecars for a consistent snapshot.
+ * يفحص مجلد الإصدار بحثاً عن أي بيانات تطوير شخصية (C-data) تسربت إليه.
  *
- * Including the WAL files ensures that any uncommitted WAL data is preserved.
- * On next boot, SQLite will automatically replay the WAL and create a clean state.
+ * - الغرض: بوابة أمان تُنهي البناء بفشل صريح إن وُجد أي أثر لقاعدة البيانات
+ *   الشخصية أو التراخيص أو مجلدات المحتوى الشخصي داخل release/app.
+ * - النطاق: أسماء ملف قاعدة البيانات الثلاثة (db/-wal/-shm) في أي مكان،
+ *   ومجلدا uploads/backups تحت data/ فقط (استثناء مجلدات routes المترجمة
+ *   في .next التي تحمل نفس الأسماء)، وأي ملف تحت مسار data/licenses/.
  *
- * @param {string} srcDir - Absolute path of the source data directory.
- * @param {string} destDir - Absolute path of the destination data directory.
+ * @param {string} rootDir - المجلد الجذري للإصدار (release/app).
+ * @returns {string[]} المسارات النسبية للمخالفات؛ مصفوفة فارغة تعني نظيفاً.
  */
-function copyDbSnapshot(srcDir, destDir) {
-  const candidates = ["media_library.db", "media_library.db-wal", "media_library.db-shm"];
-  for (const file of candidates) {
-    const src = join(srcDir, file);
-    const dest = join(destDir, file);
-    if (existsSync(src)) {
-      copyFileSync(src, dest);
-      console.log(`  ${file} → ${(statSync(dest).size / 1048576).toFixed(1)} MB`);
+export function findCDataViolations(rootDir) {
+  const DB_NAMES = new Set([
+    "media_library.db",
+    "media_library.db-wal",
+    "media_library.db-shm",
+  ]);
+  const violations = [];
+  if (!existsSync(rootDir)) return [`<missing rootDir>: ${rootDir}`];
+
+  const walk = (dir) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const p = join(dir, entry.name);
+      const rel = p.slice(rootDir.length + 1);
+      if (entry.isDirectory()) {
+        // data/uploads أو data/backups في أي عمق تحت data/ = تسريب شخصي.
+        // مجلد بنفس الاسم داخل .next/server (routes مترجمة) ليس بيانات.
+        if (/^data[\\/](uploads|backups)([\\/].*)?$/.test(rel)) {
+          violations.push(`${rel}/`);
+          continue; // لا ننزل داخل المجلد المخالف — ذكره كفاية
+        }
+        walk(p);
+      } else if (DB_NAMES.has(entry.name) || /^data[\\/]licenses[\\/]/.test(rel)) {
+        violations.push(rel);
+      }
     }
-  }
+  };
+  walk(rootDir);
+  return violations;
 }
 
 // ---------------------------------------------------------------------------
@@ -95,7 +119,7 @@ async function main() {
   const skipTools = process.argv.includes("--skip-tools");
 
   console.log("\n" + "=".repeat(60));
-  console.log("  Library Manager V2 — Release Build");
+  console.log("  Youbi — Release Build");
   console.log("=".repeat(60));
 
   // ── Step 1: Clean release dir ──────────────────────────────────────────
@@ -226,22 +250,15 @@ async function main() {
     console.warn(`  ⚠ Migrations source not found: ${MIGRATIONS_SRC}`);
   }
 
-  // ── Step 8: Copy data (DB + licenses) ──────────────────────────────────
-  console.log("▸ Copying data (DB + licenses)...");
+  // ── Step 8: Create empty runtime data dir (C-data isolation) ───────────
+  // بيانات التطوير الشخصية (قاعدة البيانات + WAL/SHM + licenses) لا تُنسخ
+  // أبداً إلى الإصدار. التطبيق ينشئ Fresh DB تلقائياً عند أول إقلاع عبر
+  // openDatabase (mkdir recursive + migrations) مع DATABASE_URL النسبي.
+  console.log("▸ Creating empty runtime data dir...");
   const releaseData = join(RELEASE_DIR, "data");
   ensureDir(releaseData);
-
-  if (existsSync(join(DATA_DIR, "media_library.db"))) {
-    copyDbSnapshot(DATA_DIR, releaseData);
-  } else {
-    console.warn("  ⚠ media_library.db not found — first boot will create a fresh DB");
-  }
-
-  // Licenses
-  const srcLic = join(DATA_DIR, "licenses");
-  if (existsSync(srcLic)) {
-    cpSync(srcLic, join(releaseData, "licenses"), { recursive: true });
-  }
+  // .gitkeep يحفظ المجلد الفارغ داخل أي أرشيف/حزمة مثبّت
+  writeFileSync(join(releaseData, ".gitkeep"), "");
 
   // ── Step 9: Copy tools (node.exe + nssm.exe) ───────────────────────────
   if (!skipTools) {
@@ -292,7 +309,7 @@ async function main() {
     join(RELEASE_DIR, "start-server.js"),
   );
   const envContent = [
-    "# Library Manager V2 — Production Environment",
+    "# Youbi — Production Environment",
     "# Generated by build-release.mjs. Overwritten by the installer per machine.",
     "",
     "NODE_ENV=production",
@@ -321,7 +338,20 @@ async function main() {
   ].join("\n");
   writeFileSync(join(RELEASE_DIR, ".env.production"), envContent);
 
-  // ── Step 12: Summary ───────────────────────────────────────────────────
+  // ── Step 12: C-data leak gate (safety) ─────────────────────────────────
+  const violations = findCDataViolations(RELEASE_DIR);
+  if (violations.length > 0) {
+    console.error("\n❌ C-DATA LEAK DETECTED — build failed.");
+    for (const v of violations) console.error(`   - ${v}`);
+    console.error(
+      "\n  Personal development data must never ship inside release/app.\n" +
+        "  Remove the offending files, then rebuild.",
+    );
+    process.exit(1);
+  }
+  console.log("▸ C-data leak gate: clean ✔");
+
+  // ── Step 13: Summary ───────────────────────────────────────────────────
   const countFiles = (dir) => {
     let count = 0;
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -357,12 +387,12 @@ async function main() {
   console.log(`  Version   : ${pkg.version}`);
   console.log("=".repeat(60));
 
-  // ── Step 13: Compile the Inno Setup installer (optional) ───────────────
+  // ── Step 14: Compile the Inno Setup installer (optional) ───────────────
   const iscc = findIscc();
   if (iscc) {
     console.log("\n▸ Compiling installer with Inno Setup...");
     run(`"${iscc}" /DMyAppVersion=${pkg.version} installer\\library-manager.iss`, ROOT);
-    console.log(`  Installer written to release\\LibraryManager-Setup-${pkg.version}.exe`);
+    console.log(`  Installer written to release\\Youbi-Setup-${pkg.version}.exe`);
   } else {
     console.log(
       "\n  ⚠ Inno Setup not found — installer NOT compiled.\n" +
@@ -397,7 +427,11 @@ function findIscc() {
   return null;
 }
 
-main().catch((err) => {
-  console.error("\nBuild failed:", err.message);
-  process.exit(1);
-});
+// يُنفَّذ main فقط عند التشغيل المباشر للسكربت؛ الاستيراد البرمجي (للاختبار)
+// آمن ولا يُطلق البناء.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((err) => {
+    console.error("\nBuild failed:", err.message);
+    process.exit(1);
+  });
+}

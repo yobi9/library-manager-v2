@@ -57,9 +57,10 @@ import { AutoBackupScheduler } from "./auto-backup-scheduler";
 import { RetentionScheduler } from "./retention-scheduler";
 import { LiveStreamService } from "./live-stream-service";
 import { LicenseService } from "./license-service";
+import { SetupService } from "./setup-service";
 
 /** مفتاح تخزين حالة الخدمات على `globalThis`. */
-const SERVICES_STATE_KEY = "__libraryManagerServicesState";
+const SERVICES_STATE_KEY = "__youbi_services_state";
 
 const globalServicesState = (globalThis as Record<string, unknown>)[SERVICES_STATE_KEY] as
   ReturnType<typeof createServices> | null | undefined;
@@ -304,6 +305,7 @@ function createServices() {
 
   const liveStreamService = new LiveStreamService();
   const licenseService = new LicenseService(activityRepo);
+  const setupService = new SetupService(userRepo, activityRepo, securityRepo);
 
   return {
     auth: authService,
@@ -344,6 +346,7 @@ function createServices() {
     retentionScheduler,
     liveStream: liveStreamService,
     license: licenseService,
+    setup: setupService,
   };
 }
 

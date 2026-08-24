@@ -96,7 +96,7 @@ export class EventBus {
 }
 
 /** مفتاح تخزين مثيل الحافلة على `globalThis`. */
-const EVENT_BUS_STATE_KEY = "__libraryManagerEventBusInstance";
+const EVENT_BUS_STATE_KEY = "__youbi_event_bus_instance";
 
 const globalEventBusInstance = (globalThis as Record<string, unknown>)[EVENT_BUS_STATE_KEY] as
   EventBus | null | undefined;

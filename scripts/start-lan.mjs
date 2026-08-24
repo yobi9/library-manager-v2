@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * LAN launcher for the Library Manager Next.js server.
+ * LAN launcher for the Youbi Next.js server.
  *
  * Reads `HOST` and `PORT` from the environment (configurable per deployment —
  * no hard-coded IP inside application code) and starts the Next.js server

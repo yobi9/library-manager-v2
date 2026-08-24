@@ -510,10 +510,10 @@ export function LibrariesPage() {
       <div className="border-border bg-secondary rounded-lg border p-4">
         <h2 className="text-sm font-bold sm:text-base">إنشاء وترتيب الأقسام</h2>
         <p className="text-muted-foreground mt-0.5 text-xs sm:text-sm">
-          تعمل الاستراحة بطريقة تقسيم المحتوى على شكل أقسام
+          تعمل Youbi بطريقة تقسيم المحتوى على شكل أقسام
         </p>
         <div className="mt-3 flex flex-col gap-1">
-          <span className="text-muted-foreground text-xs">حجم الاستراحة</span>
+          <span className="text-muted-foreground text-xs">حجم المكتبة</span>
           <span className="text-foreground text-sm font-bold">{storageGb.toFixed(2)} جيجابايت</span>
         </div>
       </div>

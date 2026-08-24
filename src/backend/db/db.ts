@@ -62,7 +62,7 @@ interface DbRuntimeState {
 }
 
 /** مفتاح تخزين حالة قاعدة البيانات على `globalThis`. */
-const RUNTIME_STATE_KEY = "__libraryManagerDbRuntimeState";
+const RUNTIME_STATE_KEY = "__youbi_db_runtime_state";
 
 const globalRuntimeState = (globalThis as Record<string, unknown>)[RUNTIME_STATE_KEY] as
   DbRuntimeState | undefined;
@@ -311,7 +311,7 @@ export function resolveDbPath(): string {
   if (process.platform === "win32") {
     return path.join(
       process.env.PROGRAMDATA || "D:\\ProgramData",
-      "LibraryManager",
+      "Youbi",
       "media_library.db",
     );
   }

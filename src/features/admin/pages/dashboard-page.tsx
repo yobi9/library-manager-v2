@@ -176,7 +176,7 @@ export function DashboardPage(): React.ReactNode {
 
   const topStats = [
     {
-      title: "تم نقلها عبر استراحة مانجر",
+      title: "تم بثها عبر Youbi",
       value: `${storageTB.toFixed(2)} TB`,
       icon: <Download size={18} />,
     },

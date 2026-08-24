@@ -19,6 +19,7 @@ import { ScanController } from "./scan-controller";
 import { EventsController } from "./events-controller";
 import { LiveStreamController } from "./live-stream-controller";
 import { LicenseController } from "./license-controller";
+import { SetupController } from "./setup-controller";
 
 /** نوع حاوية المتحكمات — وحيدة لكل عملية. */
 interface Controllers {
@@ -42,10 +43,11 @@ interface Controllers {
   events: EventsController;
   liveStream: LiveStreamController;
   license: LicenseController;
+  setup: SetupController;
 }
 
 /** مفتاح تخزين المتحكمات على `globalThis`. */
-const CONTROLLERS_STATE_KEY = "__libraryManagerControllersState";
+const CONTROLLERS_STATE_KEY = "__youbi_controllers_state";
 
 const globalControllersState = (globalThis as Record<string, unknown>)[CONTROLLERS_STATE_KEY] as
   Controllers | null | undefined;
@@ -88,6 +90,7 @@ export function getControllers() {
     events: new EventsController(s.activity, s.security),
     liveStream: new LiveStreamController(s.liveStream),
     license: new LicenseController(s.license),
+    setup: new SetupController(s.setup),
   };
   (globalThis as Record<string, unknown>)[CONTROLLERS_STATE_KEY] = controllers;
   return controllers;
@@ -113,3 +116,4 @@ export { MessagesController } from "./messages-controller";
 export { EventsController } from "./events-controller";
 export { LiveStreamController } from "./live-stream-controller";
 export { LicenseController } from "./license-controller";
+export { SetupController } from "./setup-controller";

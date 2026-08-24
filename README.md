@@ -1,9 +1,9 @@
-# Library Manager V2 — Estra7ahyobi (استراحة)
+# Youbi
 
-Full-stack **Next.js 16 / React 19** monolith — an Arabic (RTL, `lang="ar"`) media library manager
-with a viewer front end, an admin dashboard, and a backend scanner/enrichment pipeline.
+Full-stack **Next.js 16 / React 19** monolith — an Arabic (RTL, `lang="ar"`) media streaming
+platform with a viewer front end, an admin dashboard, and a backend scanner/enrichment pipeline.
 
-مدير مكتبة وسائط كامل بواجهة عربية RTL: واجهة مشاهد، لوحة إدارة، ونظام فحص وإثراء للوسائط.
+منصة بث وسائط كاملة بواجهة عربية RTL: واجهة مشاهدة، لوحة إدارة، ونظام فحص وإثراء للوسائط.
 
 ---
 

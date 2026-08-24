@@ -1,4 +1,16 @@
-export const APP_NAME = "استراحة";
+/**
+ * [Domain] هوية المنتج الرسمية (Official Product Name).
+ *
+ * - الغرض: الاسم التجاري/التقني الموحّد للمنتج "Youbi" — immutable product
+ *   identity يُستخدم كـ fallback في كل الأسطح (metadata، الترويسة، التذييل،
+ *   تسجيل الدخول، الشروط).
+ * - مصدر الحقيقة: هذا الملف فقط؛ أي اسم آخر مكرر في الكود يُعدّ خرقاً للقاعدة.
+ * - النطاق: العرض النصي العام والإداري؛ لا يشمل أسماء الخدمات أو الحزم التقنية
+ *   (package.json / خدمة Windows) التي تُدار من سكربتات الإصدار والمثبّت.
+ * - الحدود: هذا ليس Customer Branding — اسم الموقع الخاص بالعميل يأتي من
+ *   إعداد `site_title` ويبقى منفصلاً تماماً عن هنا.
+ */
+export const APP_NAME = "Youbi";
 export const APP_DESCRIPTION = "منصة بث الوسائط";
 
 export const ROUTES = {

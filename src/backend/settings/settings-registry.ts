@@ -83,7 +83,7 @@ export const SETTINGS_REGISTRY: readonly SettingDefinition[] = [
   {
     key: "site_owner",
     type: "string",
-    defaultValue: "Yuobi",
+    defaultValue: "Youbi",
     category: "general",
     isPublic: true,
     maxLength: 100,

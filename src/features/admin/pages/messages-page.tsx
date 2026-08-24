@@ -118,7 +118,7 @@ export function MessagesPage() {
             </Badge>
           </div>
           <p className="text-muted-foreground max-w-xl text-sm">
-            يمكنك إرسال رسالة إلى جميع عملائك في الاستراحة على التطبيق والمتصفح.
+            يمكنك إرسال رسالة إلى جميع عملائك في Youbi على التطبيق والمتصفح.
           </p>
         </div>
         <Button onClick={() => setSendModalOpen(true)} className="shrink-0 gap-2">
